@@ -1,0 +1,6 @@
+{
+  "name": "GlucoLog",
+  "description": "A smart, local mobile application for tracking insulin doses, blood glucose levels, reminders, and daily/weekly/monthly summaries.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
