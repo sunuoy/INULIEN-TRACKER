@@ -2453,6 +2453,108 @@ fun ReportsScreen(viewModel: GlucoViewModel) {
                 }
             }
         }
+
+        // Sandbox & Demo Data Controller Section
+        item {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("reports_sandbox_card"),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.15f)),
+                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.tertiary.copy(alpha = 0.3f))
+            ) {
+                Column(
+                    modifier = Modifier.padding(18.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .background(MaterialTheme.colorScheme.tertiary.copy(alpha = 0.1f), CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Info,
+                                contentDescription = "Demo Sandbox Icon",
+                                tint = MaterialTheme.colorScheme.tertiary
+                            )
+                        }
+                        Column {
+                            Text(
+                                "Evaluation Sandbox",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                "Populate or reset records for 6-month visual analysis",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.outline
+                            )
+                        }
+                    }
+
+                    Divider()
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        var isGenerating by remember { mutableStateOf(false) }
+
+                        Button(
+                            onClick = {
+                                isGenerating = true
+                                viewModel.generateSixMonthsSampleData {
+                                    isGenerating = false
+                                    android.widget.Toast.makeText(context, "6 Months comprehensive sample logs added successfully!", android.widget.Toast.LENGTH_LONG).show()
+                                }
+                            },
+                            enabled = !isGenerating,
+                            modifier = Modifier.weight(1.3f).testTag("generate_sample_data_button"),
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            if (isGenerating) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(16.dp),
+                                    strokeWidth = 2.dp,
+                                    color = MaterialTheme.colorScheme.onTertiary
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Populating...", fontSize = 11.sp, maxLines = 1)
+                            } else {
+                                Icon(Icons.Default.Add, contentDescription = "Add Data", modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Load 6m Demo Data", fontSize = 11.sp, maxLines = 1)
+                            }
+                        }
+
+                        OutlinedButton(
+                            onClick = {
+                                viewModel.clearAllLogs {
+                                    android.widget.Toast.makeText(context, "All historical logs cleared successfully.", android.widget.Toast.LENGTH_LONG).show()
+                                }
+                            },
+                            modifier = Modifier.weight(1f).testTag("clear_sample_data_button"),
+                            shape = RoundedCornerShape(10.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.4f))
+                        ) {
+                            Icon(Icons.Default.Delete, contentDescription = "Clear Data", modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.error)
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Clear Logs", fontSize = 11.sp, maxLines = 1, color = MaterialTheme.colorScheme.error)
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 

@@ -22,6 +22,9 @@ interface InsulinDao {
 
     @Query("DELETE FROM insulin_records WHERE id = :id")
     suspend fun deleteInsulinRecordById(id: Long)
+
+    @Query("DELETE FROM insulin_records")
+    suspend fun clearAllInsulinRecords()
 }
 
 @Dao
@@ -37,6 +40,9 @@ interface GlucoseDao {
 
     @Query("DELETE FROM glucose_readings WHERE id = :id")
     suspend fun deleteGlucoseReadingById(id: Long)
+
+    @Query("DELETE FROM glucose_readings")
+    suspend fun clearAllGlucoseReadings()
 }
 
 @Dao

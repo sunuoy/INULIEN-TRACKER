@@ -1124,6 +1124,141 @@ class GlucoViewModel(application: Application) : AndroidViewModel(application) {
 
         return file
     }
+
+    fun generateSixMonthsSampleData(onComplete: () -> Unit) {
+        viewModelScope.launch {
+            val isMmol = (userProfile.value.glucoseUnit == "mmol/L")
+            val rand = java.util.Random()
+            val curTime = getCurrentTimeMillis()
+            
+            for (i in 180 downTo 1) {
+                val calendar = Calendar.getInstance()
+                calendar.timeInMillis = curTime
+                calendar.add(Calendar.DAY_OF_YEAR, -i)
+                val baseTime = calendar.timeInMillis
+                
+                // 1. Glucose readings (2 per day)
+                val fastingCal = Calendar.getInstance().apply {
+                    timeInMillis = baseTime
+                    set(Calendar.HOUR_OF_DAY, 7)
+                    set(Calendar.MINUTE, rand.nextInt(40) + 10)
+                    set(Calendar.SECOND, 0)
+                }
+                val fastingValue = if (isMmol) {
+                    4.2 + (rand.nextDouble() * 2.1)
+                } else {
+                    75.0 + (rand.nextDouble() * 40.0)
+                }
+                repository.insertGlucoseReading(
+                    GlucoseReading(
+                        readingValue = fastingValue,
+                        mealContext = "Fasting",
+                        dateTimeMillis = fastingCal.timeInMillis,
+                        notes = "Auto-generated fasting test log"
+                    )
+                )
+
+                val afterDinnerCal = Calendar.getInstance().apply {
+                    timeInMillis = baseTime
+                    set(Calendar.HOUR_OF_DAY, 19)
+                    set(Calendar.MINUTE, rand.nextInt(40) + 10)
+                    set(Calendar.SECOND, 0)
+                }
+                val postMealValue = if (isMmol) {
+                    5.5 + (rand.nextDouble() * 4.5)
+                } else {
+                    100.0 + (rand.nextDouble() * 80.0)
+                }
+                repository.insertGlucoseReading(
+                    GlucoseReading(
+                        readingValue = postMealValue,
+                        mealContext = "After Meal",
+                        dateTimeMillis = afterDinnerCal.timeInMillis,
+                        notes = "Auto-generated post dinner test log"
+                    )
+                )
+
+                // 2. Insulin records (2 per day)
+                val longActingCal = Calendar.getInstance().apply {
+                    timeInMillis = baseTime
+                    set(Calendar.HOUR_OF_DAY, 22)
+                    set(Calendar.MINUTE, rand.nextInt(30))
+                    set(Calendar.SECOND, 0)
+                }
+                repository.insertInsulinRecord(
+                    InsulinRecord(
+                        insulinType = "Long-acting",
+                        doseUnits = (14 + rand.nextInt(7)).toDouble(),
+                        dateTimeMillis = longActingCal.timeInMillis,
+                        notes = "Auto-generated daily long-acting basal dose"
+                    )
+                )
+
+                val rapidCal = Calendar.getInstance().apply {
+                    timeInMillis = baseTime
+                    set(Calendar.HOUR_OF_DAY, 18)
+                    set(Calendar.MINUTE, rand.nextInt(30))
+                    set(Calendar.SECOND, 0)
+                }
+                repository.insertInsulinRecord(
+                    InsulinRecord(
+                        insulinType = "Rapid-acting",
+                        doseUnits = (4 + rand.nextInt(5)).toDouble(),
+                        dateTimeMillis = rapidCal.timeInMillis,
+                        notes = "Auto-generated rapid-acting dinner bolus"
+                    )
+                )
+
+                // 3. Blood Pressure record (1 every 2 days)
+                if (i % 2 == 0) {
+                    val bpCal = Calendar.getInstance().apply {
+                        timeInMillis = baseTime
+                        set(Calendar.HOUR_OF_DAY, 10 + rand.nextInt(4))
+                        set(Calendar.MINUTE, rand.nextInt(60))
+                        set(Calendar.SECOND, 0)
+                    }
+                    repository.insertBloodPressureRecord(
+                        BloodPressureRecord(
+                            systolic = 115 + rand.nextInt(18),
+                            diastolic = 72 + rand.nextInt(12),
+                            pulse = 64 + rand.nextInt(16),
+                            dateTimeMillis = bpCal.timeInMillis,
+                            notes = "Auto-generated periodic BP reading"
+                        )
+                    )
+                }
+
+                // 4. Cartridge Refills (every 14 days)
+                if (i % 14 == 0) {
+                    val refillCal = Calendar.getInstance().apply {
+                        timeInMillis = baseTime
+                        set(Calendar.HOUR_OF_DAY, 9)
+                        set(Calendar.MINUTE, rand.nextInt(60))
+                        set(Calendar.SECOND, 0)
+                    }
+                    repository.insertRefillLog(
+                        CartridgeRefillLog(
+                            capacity = 300.0,
+                            remainingBefore = (10 + rand.nextInt(25)).toDouble(),
+                            dateTimeMillis = refillCal.timeInMillis,
+                            actionType = "Refill"
+                        )
+                    )
+                }
+            }
+            onComplete()
+        }
+    }
+
+    fun clearAllLogs(onComplete: () -> Unit) {
+        viewModelScope.launch {
+            repository.clearAllGlucoseReadings()
+            repository.clearAllInsulinRecords()
+            repository.clearAllBloodPressureRecords()
+            repository.clearAllRefillLogs()
+            onComplete()
+        }
+    }
 }
 
 data class ReportsSummary(

@@ -37,6 +37,10 @@ class AppRepository(
         insulinDao.deleteInsulinRecordById(id)
     }
 
+    suspend fun clearAllInsulinRecords() {
+        insulinDao.clearAllInsulinRecords()
+    }
+
     // Glucose Readings
     val allGlucoseReadings: Flow<List<GlucoseReading>> = glucoseDao.getAllGlucoseReadings()
 
@@ -50,6 +54,10 @@ class AppRepository(
 
     suspend fun deleteGlucoseReadingById(id: Long) {
         glucoseDao.deleteGlucoseReadingById(id)
+    }
+
+    suspend fun clearAllGlucoseReadings() {
+        glucoseDao.clearAllGlucoseReadings()
     }
 
     // Reminders
