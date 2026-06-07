@@ -32,6 +32,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -54,8 +56,13 @@ import java.util.*
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun GlucoAppLayout(viewModel: GlucoViewModel) {
-    val currentScreen by viewModel.currentScreen.collectAsStateWithLifecycle()
-    val rawInsulinList by viewModel.insulinRecords.collectAsStateWithLifecycle()
+    val isLoggedIn by viewModel.isLoggedIn.collectAsStateWithLifecycle()
+
+    if (!isLoggedIn) {
+        LoginScreen(viewModel = viewModel)
+    } else {
+        val currentScreen by viewModel.currentScreen.collectAsStateWithLifecycle()
+        val rawInsulinList by viewModel.insulinRecords.collectAsStateWithLifecycle()
     val rawGlucoseList by viewModel.glucoseReadings.collectAsStateWithLifecycle()
     val profilesState by viewModel.userProfile.collectAsStateWithLifecycle()
 
@@ -227,7 +234,359 @@ fun GlucoAppLayout(viewModel: GlucoViewModel) {
              }
          )
      }
- }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun LoginScreen(viewModel: GlucoViewModel) {
+    var username by remember { mutableStateOf("") }
+    var email by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var confirmPassword by remember { mutableStateOf("") }
+    var passwordVisible by remember { mutableStateOf(false) }
+    var confirmPasswordVisible by remember { mutableStateOf(false) }
+    var isRegisterMode by remember { mutableStateOf(false) }
+    var showForgotPasswordDialog by remember { mutableStateOf(false) }
+    val loginError by viewModel.loginError.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+
+    if (showForgotPasswordDialog) {
+        AlertDialog(
+            onDismissRequest = { showForgotPasswordDialog = false },
+            title = {
+                Text(
+                    text = "Request Password Reset",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        text = "For medical database integrity and HIPAA conformity, password recoveries require system authentication.",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Text(
+                        text = "• Patient accounts: Please contact your clinical supervisor or diabetes care team to set up a new credential key.\n" +
+                               "• Admin accounts: Please verify environment key assets or secure database settings directly.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.outline
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showForgotPasswordDialog = false }) {
+                    Text("Close")
+                }
+            },
+            shape = RoundedCornerShape(16.dp)
+        )
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(
+                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f),
+                        MaterialTheme.colorScheme.surface
+                    )
+                )
+            )
+            .padding(24.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .widthIn(max = 420.dp)
+                .testTag("login_card"),
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // Clinic clinical brand icon
+                Box(
+                    modifier = Modifier
+                        .size(64.dp)
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = if (isRegisterMode) Icons.Default.AccountBox else Icons.Default.Lock,
+                        contentDescription = "Clinician Secure Log",
+                        modifier = Modifier.size(32.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = if (isRegisterMode) "Create Account" else "GlucoLog Portal",
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = if (isRegisterMode) "Register to track clinical metrics" else "Diabetes Tracking System",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.outline,
+                        textAlign = TextAlign.Center
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                OutlinedTextField(
+                    value = username,
+                    onValueChange = { 
+                        username = it
+                        viewModel.clearLoginError()
+                    },
+                    label = { Text(if (isRegisterMode) "Username" else "Username or Email ID") },
+                    placeholder = { Text(if (isRegisterMode) "Enter username" else "Enter username or email") },
+                    singleLine = true,
+                    leadingIcon = {
+                        Icon(Icons.Default.Person, contentDescription = "Username field icon")
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("login_username_input"),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
+                    shape = RoundedCornerShape(12.dp)
+                )
+
+                if (isRegisterMode) {
+                    OutlinedTextField(
+                        value = email,
+                        onValueChange = { 
+                            email = it
+                            viewModel.clearLoginError()
+                        },
+                        label = { Text("Email ID (Gmail or Hotmail)") },
+                        placeholder = { Text("yourname@gmail.com / hotmail.com") },
+                        singleLine = true,
+                        leadingIcon = {
+                            Icon(Icons.Default.Email, contentDescription = "Email field icon")
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("login_email_input"),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                }
+
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    OutlinedTextField(
+                        value = password,
+                        onValueChange = { 
+                            password = it
+                            viewModel.clearLoginError()
+                        },
+                        label = { Text("Password") },
+                        placeholder = { Text("Enter password") },
+                        singleLine = true,
+                        leadingIcon = {
+                            Icon(Icons.Default.Lock, contentDescription = "Password field icon")
+                        },
+                        trailingIcon = {
+                            IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                                Icon(
+                                    imageVector = if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                                    contentDescription = if (passwordVisible) "Toggle Password Visibility" else "Toggle Password Visibility"
+                                )
+                            }
+                        },
+                        visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("login_password_input"),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+
+                    if (!isRegisterMode) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.End
+                        ) {
+                            TextButton(
+                                onClick = { showForgotPasswordDialog = true },
+                                modifier = Modifier.testTag("forgot_password_button"),
+                                contentPadding = PaddingValues(0.dp)
+                            ) {
+                                Text(
+                                    "Forgot Password?",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+                }
+
+                if (isRegisterMode) {
+                    OutlinedTextField(
+                        value = confirmPassword,
+                        onValueChange = { 
+                            confirmPassword = it
+                            viewModel.clearLoginError()
+                        },
+                        label = { Text("Confirm Password") },
+                        placeholder = { Text("Re-enter password") },
+                        singleLine = true,
+                        leadingIcon = {
+                            Icon(Icons.Default.Lock, contentDescription = "Confirm password field icon")
+                        },
+                        trailingIcon = {
+                            IconButton(onClick = { confirmPasswordVisible = !confirmPasswordVisible }) {
+                                Icon(
+                                    imageVector = if (confirmPasswordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                                    contentDescription = if (confirmPasswordVisible) "Toggle Password Visibility" else "Toggle Password Visibility"
+                                )
+                            }
+                        },
+                        visualTransformation = if (confirmPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("login_confirm_password_input"),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                }
+
+                if (loginError != null) {
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.4f)),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = loginError ?: "",
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier
+                                .padding(horizontal = 12.dp, vertical = 6.dp)
+                                .testTag("login_error_message")
+                        )
+                    }
+                }
+
+                Button(
+                    onClick = {
+                        if (isRegisterMode) {
+                            if (password != confirmPassword) {
+                                viewModel.setLoginError("Passwords do not match!")
+                            } else {
+                                val success = viewModel.registerUser(username, email, password)
+                                if (success) {
+                                    android.widget.Toast.makeText(context, "Account created successfully! You can now log in.", android.widget.Toast.LENGTH_LONG).show()
+                                    isRegisterMode = false
+                                    confirmPassword = ""
+                                    email = ""
+                                }
+                            }
+                        } else {
+                            val success = viewModel.login(username, password)
+                            if (success) {
+                                android.widget.Toast.makeText(context, "Successfully authorized!", android.widget.Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp)
+                        .testTag("login_button"),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text(
+                        text = if (isRegisterMode) "Create Account" else "Secure Login",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                // Switch between login and signup modes
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = if (isRegisterMode) "Already have an account?" else "Don't have an account?",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    TextButton(
+                        onClick = {
+                            isRegisterMode = !isRegisterMode
+                            viewModel.clearLoginError()
+                            confirmPassword = ""
+                            email = ""
+                        },
+                        modifier = Modifier.testTag("toggle_register_mode_button"),
+                        contentPadding = PaddingValues(0.dp)
+                    ) {
+                        Text(
+                            text = if (isRegisterMode) "Sign In" else "Create Account",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                // Guide credentials card (without admin details)
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)),
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(
+                            text = "Portal Guidelines:",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Divider(
+                            modifier = Modifier.fillMaxWidth(),
+                            thickness = 0.5.dp,
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                        )
+                        Text(
+                            text = "• Patient Access: Create an account or log in under your credentials as a standard patient.",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
 
 private data class NavigationItem(
     val title: String,
@@ -1951,6 +2310,7 @@ fun ReminderCard(
 // ==========================================
 @Composable
 fun ReportsScreen(viewModel: GlucoViewModel) {
+    val isAdmin by viewModel.isAdmin.collectAsStateWithLifecycle()
     val rawInsulin by viewModel.insulinRecords.collectAsStateWithLifecycle()
     val rawGlucose by viewModel.glucoseReadings.collectAsStateWithLifecycle()
     val rawBp by viewModel.bloodPressureRecords.collectAsStateWithLifecycle()
@@ -2454,102 +2814,104 @@ fun ReportsScreen(viewModel: GlucoViewModel) {
             }
         }
 
-        // Sandbox & Demo Data Controller Section
-        item {
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("reports_sandbox_card"),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.15f)),
-                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.tertiary.copy(alpha = 0.3f))
-            ) {
-                Column(
-                    modifier = Modifier.padding(18.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+        if (isAdmin) {
+            // Sandbox & Demo Data Controller Section
+            item {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("reports_sandbox_card"),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.15f)),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.tertiary.copy(alpha = 0.3f))
                 ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    Column(
+                        modifier = Modifier.padding(18.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(36.dp)
-                                .background(MaterialTheme.colorScheme.tertiary.copy(alpha = 0.1f), CircleShape),
-                            contentAlignment = Alignment.Center
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.Info,
-                                contentDescription = "Demo Sandbox Icon",
-                                tint = MaterialTheme.colorScheme.tertiary
-                            )
-                        }
-                        Column {
-                            Text(
-                                "Evaluation Sandbox",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Text(
-                                "Populate or reset records for 6-month visual analysis",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.outline
-                            )
-                        }
-                    }
-
-                    Divider()
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        var isGenerating by remember { mutableStateOf(false) }
-
-                        Button(
-                            onClick = {
-                                isGenerating = true
-                                viewModel.generateSixMonthsSampleData {
-                                    isGenerating = false
-                                    android.widget.Toast.makeText(context, "6 Months comprehensive sample logs added successfully!", android.widget.Toast.LENGTH_LONG).show()
-                                }
-                            },
-                            enabled = !isGenerating,
-                            modifier = Modifier.weight(1.3f).testTag("generate_sample_data_button"),
-                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary),
-                            shape = RoundedCornerShape(10.dp)
-                        ) {
-                            if (isGenerating) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(16.dp),
-                                    strokeWidth = 2.dp,
-                                    color = MaterialTheme.colorScheme.onTertiary
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .background(MaterialTheme.colorScheme.tertiary.copy(alpha = 0.1f), CircleShape),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Info,
+                                    contentDescription = "Demo Sandbox Icon",
+                                    tint = MaterialTheme.colorScheme.tertiary
                                 )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text("Populating...", fontSize = 11.sp, maxLines = 1)
-                            } else {
-                                Icon(Icons.Default.Add, contentDescription = "Add Data", modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("Load 6m Demo Data", fontSize = 11.sp, maxLines = 1)
+                            }
+                            Column {
+                                Text(
+                                    "Evaluation Sandbox",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    "Populate or reset records for 6-month visual analysis",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.outline
+                                )
                             }
                         }
 
-                        OutlinedButton(
-                            onClick = {
-                                viewModel.clearAllLogs {
-                                    android.widget.Toast.makeText(context, "All historical logs cleared successfully.", android.widget.Toast.LENGTH_LONG).show()
-                                }
-                            },
-                            modifier = Modifier.weight(1f).testTag("clear_sample_data_button"),
-                            shape = RoundedCornerShape(10.dp),
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.4f))
+                        Divider()
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Icon(Icons.Default.Delete, contentDescription = "Clear Data", modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.error)
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Clear Logs", fontSize = 11.sp, maxLines = 1, color = MaterialTheme.colorScheme.error)
+                            var isGenerating by remember { mutableStateOf(false) }
+
+                            Button(
+                                onClick = {
+                                    isGenerating = true
+                                    viewModel.generateSixMonthsSampleData {
+                                        isGenerating = false
+                                        android.widget.Toast.makeText(context, "6 Months comprehensive sample logs added successfully!", android.widget.Toast.LENGTH_LONG).show()
+                                    }
+                                },
+                                enabled = !isGenerating,
+                                modifier = Modifier.weight(1.3f).testTag("generate_sample_data_button"),
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary),
+                                shape = RoundedCornerShape(10.dp)
+                            ) {
+                                if (isGenerating) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(16.dp),
+                                        strokeWidth = 2.dp,
+                                        color = MaterialTheme.colorScheme.onTertiary
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Populating...", fontSize = 11.sp, maxLines = 1)
+                                } else {
+                                    Icon(Icons.Default.Add, contentDescription = "Add Data", modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("Load 6m Demo Data", fontSize = 11.sp, maxLines = 1)
+                                }
+                            }
+
+                            OutlinedButton(
+                                onClick = {
+                                    viewModel.clearAllLogs {
+                                        android.widget.Toast.makeText(context, "All historical logs cleared successfully.", android.widget.Toast.LENGTH_LONG).show()
+                                    }
+                                },
+                                modifier = Modifier.weight(1f).testTag("clear_sample_data_button"),
+                                shape = RoundedCornerShape(10.dp),
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.4f))
+                            ) {
+                                Icon(Icons.Default.Delete, contentDescription = "Clear Data", modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.error)
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Clear Logs", fontSize = 11.sp, maxLines = 1, color = MaterialTheme.colorScheme.error)
+                            }
                         }
                     }
                 }
@@ -2597,6 +2959,8 @@ fun TirLegendItem(color: Color, label: String, value: String) {
 fun ProfileScreen(viewModel: GlucoViewModel) {
     val currentProfile by viewModel.userProfile.collectAsStateWithLifecycle()
     val savedProfiles by viewModel.allProfiles.collectAsStateWithLifecycle()
+    val loggedInUser by viewModel.loggedInUser.collectAsStateWithLifecycle()
+    val isAdmin by viewModel.isAdmin.collectAsStateWithLifecycle()
 
     var uName by remember { mutableStateOf(currentProfile.userName) }
     var dName by remember { mutableStateOf(currentProfile.doctorName) }
@@ -2638,6 +3002,76 @@ fun ProfileScreen(viewModel: GlucoViewModel) {
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.outline
                 )
+            }
+        }
+
+        // Authentication details (Admin credentials log out card)
+        item {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("profile_auth_card"),
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.25f))
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(
+                            text = "Logged in as:",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.outline
+                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Text(
+                                text = loggedInUser.ifEmpty { "Guest Patient" },
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                            if (isAdmin) {
+                                Card(
+                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primary),
+                                    shape = RoundedCornerShape(6.dp)
+                                ) {
+                                    Text(
+                                        text = "ADMIN",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onPrimary,
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    OutlinedButton(
+                        onClick = { viewModel.logout() },
+                        modifier = Modifier.testTag("logout_button"),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.5f)),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.ExitToApp,
+                            contentDescription = "Sign Out Icon",
+                            modifier = Modifier.size(16.dp),
+                            tint = MaterialTheme.colorScheme.error
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Log Out", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error)
+                    }
+                }
             }
         }
 

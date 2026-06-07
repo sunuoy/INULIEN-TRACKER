@@ -1,6 +1,7 @@
 package com.example.ui.viewmodel
 
 import android.app.Application
+import android.content.Context
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.database.AppDatabase
@@ -99,6 +100,146 @@ class GlucoViewModel(application: Application) : AndroidViewModel(application) {
     var bpTime = ""
     var bpNotes = ""
     var selectedBpIdToEdit: Long? = null
+
+    // Login & Auth State
+    private val _isLoggedIn = MutableStateFlow(false)
+    val isLoggedIn: StateFlow<Boolean> = _isLoggedIn.asStateFlow()
+
+    private val _isAdmin = MutableStateFlow(false)
+    val isAdmin: StateFlow<Boolean> = _isAdmin.asStateFlow()
+
+    private val _loggedInUser = MutableStateFlow("")
+    val loggedInUser: StateFlow<String> = _loggedInUser.asStateFlow()
+
+    private val _loginError = MutableStateFlow<String?>(null)
+    val loginError: StateFlow<String?> = _loginError.asStateFlow()
+
+    fun login(username: String, password: String): Boolean {
+        _loginError.value = null
+        val trimmed = username.trim()
+        if (trimmed.isEmpty()) {
+            _loginError.value = "Username or Email cannot be empty"
+            return false
+        }
+        if (password.isEmpty()) {
+            _loginError.value = "Password cannot be empty"
+            return false
+        }
+
+        if (trimmed == "admin") {
+            if (password == "yM*d^@Irf 741$") {
+                _isAdmin.value = true
+                _loggedInUser.value = trimmed
+                _isLoggedIn.value = true
+                return true
+            } else {
+                _loginError.value = "Incorrect admin password"
+                return false
+            }
+        } else {
+            // General registered user login (can use username or registered email)
+            val prefs = getApplication<Application>().getSharedPreferences("gluco_auth_prefs", Context.MODE_PRIVATE)
+            val resolvedUsername = if (trimmed.contains("@")) {
+                prefs.getString("email_to_user_${trimmed.lowercase()}", null)
+            } else {
+                trimmed
+            }
+
+            if (resolvedUsername == null) {
+                _loginError.value = if (trimmed.contains("@")) {
+                    "No account associated with this email address."
+                } else {
+                    "Account does not exist. Please create an account first."
+                }
+                return false
+            }
+
+            val savedPassword = prefs.getString("user_pass_$resolvedUsername", null)
+            if (savedPassword == null) {
+                _loginError.value = "Account does not exist. Please create an account first."
+                return false
+            } else if (savedPassword != password) {
+                _loginError.value = "Incorrect password"
+                return false
+            } else {
+                _isAdmin.value = false
+                _loggedInUser.value = resolvedUsername
+                _isLoggedIn.value = true
+                return true
+            }
+        }
+    }
+
+    fun registerUser(username: String, email: String, password: String): Boolean {
+        _loginError.value = null
+        val trimmedUser = username.trim()
+        val trimmedEmail = email.trim().lowercase()
+        
+        if (trimmedUser.isEmpty()) {
+            _loginError.value = "Username cannot be empty"
+            return false
+        }
+        if (trimmedEmail.isEmpty()) {
+            _loginError.value = "Email ID cannot be empty"
+            return false
+        }
+        if (password.isEmpty()) {
+            _loginError.value = "Password cannot be empty"
+            return false
+        }
+        if (trimmedUser.lowercase() == "admin") {
+            _loginError.value = "Username 'admin' is a restricted credentials key"
+            return false
+        }
+
+        // Email domain validation (gmail or hotmail/outlook/live)
+        val emailRegex = "^[A-Za-z0-9+_.-]+@(.+)\$".toRegex()
+        if (!emailRegex.matches(trimmedEmail)) {
+            _loginError.value = "Please enter a valid email address"
+            return false
+        }
+
+        val isGmail = trimmedEmail.endsWith("@gmail.com")
+        val isHotmail = trimmedEmail.endsWith("@hotmail.com") || trimmedEmail.endsWith("@outlook.com") || trimmedEmail.endsWith("@live.com")
+
+        if (!isGmail && !isHotmail) {
+            _loginError.value = "Clinical synchronization requires a Gmail (@gmail.com) or Hotmail/Outlook (@hotmail.com, @outlook.com) account."
+            return false
+        }
+
+        val prefs = getApplication<Application>().getSharedPreferences("gluco_auth_prefs", Context.MODE_PRIVATE)
+        if (prefs.contains("user_pass_$trimmedUser")) {
+            _loginError.value = "Username already exists. Please choose another"
+            return false
+        }
+
+        if (prefs.contains("email_to_user_$trimmedEmail")) {
+            _loginError.value = "An account with this email address already exists"
+            return false
+        }
+
+        prefs.edit()
+            .putString("user_pass_$trimmedUser", password)
+            .putString("user_email_$trimmedUser", trimmedEmail)
+            .putString("email_to_user_$trimmedEmail", trimmedUser)
+            .apply()
+        return true
+    }
+
+    fun logout() {
+        _isLoggedIn.value = false
+        _isAdmin.value = false
+        _loggedInUser.value = ""
+        _loginError.value = null
+    }
+
+    fun clearLoginError() {
+        _loginError.value = null
+    }
+
+    fun setLoginError(message: String?) {
+        _loginError.value = message
+    }
 
     // Init Database & Streams
     init {
