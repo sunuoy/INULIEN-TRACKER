@@ -1,6 +1,5 @@
 <div align="center">
-<img width="1200" height="475" alt="GHBanner" src="<img width="1024" height="1024" alt="Gemini_Generated_Image_u30sywu30sywu30s" [src="https://github.com/sunuoy/INULIEN-TRACKER/blob/main/.build-outputs/Gemini_Generated_Image_u30sywu30sywu30s.png]
-  (https://github.com/sunuoy/INULIEN-TRACKER/blob/main/.build-outputs/Gemini_Generated_Image_u30sywu30sywu30s.png)" />
+<img width="1200" height="475" alt="GHBanner" src="<img width="1024" height="1024" alt="Gemini_Generated_Image_u30sywu30sywu30s" [src="https://github.com/sunuoy/INULIEN-TRACKER/blob/main/.build-outputs/Gemini_Generated_Image_u30sywu30sywu30s.png]" />
 " />
 </div>
 
