@@ -1,5 +1,6 @@
 <div align="center">
-<img width="1200" height="475" alt="GHBanner" src="<img width="1024" height="1024" alt="Gemini_Generated_Image_u30sywu30sywu30s" src="https://github.com/user-attachments/assets/97d5f27d-da25-4a33-b066-f78f84b50cec" />
+<img width="1200" height="475" alt="GHBanner" src="<img width="1024" height="1024" alt="Gemini_Generated_Image_u30sywu30sywu30s" [src="https://github.com/sunuoy/INULIEN-TRACKER/blob/main/.build-outputs/Gemini_Generated_Image_u30sywu30sywu30s.png]
+  (https://github.com/sunuoy/INULIEN-TRACKER/blob/main/.build-outputs/Gemini_Generated_Image_u30sywu30sywu30s.png)" />
 " />
 </div>
 A smart, local mobile application for tracking insulin doses, blood glucose levels, reminders, and daily/weekly/monthly summaries.
