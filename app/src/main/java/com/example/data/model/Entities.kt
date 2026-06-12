@@ -44,7 +44,7 @@ data class UserProfile(
     val glucoseUnit: String = "mg/dL", // mg/dL or mmol/L
     val isActive: Boolean = false,
     val cartridgeCapacity: Double = 300.0,
-    val cartridgeRemaining: Double = 300.0
+    val cartridgeRemaining: Double = 0.0
 )
 
 @Entity(tableName = "cartridge_refill_logs")

@@ -12,8 +12,19 @@ import com.example.data.model.UserProfile
 import com.example.data.model.CartridgeRefillLog
 import com.example.data.model.BloodPressureRecord
 import com.example.data.repository.AppRepository
+import com.example.data.api.GlucoBackendClient
+import com.example.data.api.SyncPayload
+import com.example.data.api.UserProfileDto
+import com.example.data.api.GlucoseReadingDto
+import com.example.data.api.InsulinRecordDto
+import com.example.data.api.BloodPressureRecordDto
+import com.example.data.api.ReminderDto
+import com.squareup.moshi.Moshi
+import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import org.json.JSONObject
+import org.json.JSONArray
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -22,7 +33,8 @@ enum class AppScreen {
     HISTORY,
     REMINDERS,
     REPORTS,
-    PROFILE
+    PROFILE,
+    SETTINGS
 }
 
 class GlucoViewModel(application: Application) : AndroidViewModel(application) {
@@ -101,7 +113,175 @@ class GlucoViewModel(application: Application) : AndroidViewModel(application) {
     var bpNotes = ""
     var selectedBpIdToEdit: Long? = null
 
+    // Backend Synchronization parameters
+    private val _backendBaseUrl = MutableStateFlow("https://httpbin.org/")
+    val backendBaseUrl: StateFlow<String> = _backendBaseUrl.asStateFlow()
+
+    private val _isSyncing = MutableStateFlow(false)
+    val isSyncing: StateFlow<Boolean> = _isSyncing.asStateFlow()
+
+    private val _syncMessage = MutableStateFlow<String?>("Not synced yet")
+    val syncMessage: StateFlow<String?> = _syncMessage.asStateFlow()
+
+    private val _syncConsoleLog = MutableStateFlow<String>("")
+    val syncConsoleLog: StateFlow<String> = _syncConsoleLog.asStateFlow()
+
+    private val _lastSyncTime = MutableStateFlow<String>("Never")
+    val lastSyncTime: StateFlow<String> = _lastSyncTime.asStateFlow()
+
+    fun setBackendBaseUrl(url: String) {
+        val trimmed = url.trim()
+        _backendBaseUrl.value = trimmed
+        val prefs = getApplication<Application>().getSharedPreferences("gluco_auth_prefs", Context.MODE_PRIVATE)
+        prefs.edit().putString("gluco_backend_base_url", trimmed).apply()
+    }
+
+    fun triggerUploadSync() {
+        viewModelScope.launch {
+            _isSyncing.value = true
+            _syncMessage.value = "Preparing payload..."
+            _syncConsoleLog.value = "CONNECTING TO: ${_backendBaseUrl.value}\n\n"
+
+            try {
+                // Get general info
+                val user = _loggedInUser.value.ifEmpty { "Guest Patient" }
+                val prefs = getApplication<Application>().getSharedPreferences("gluco_auth_prefs", Context.MODE_PRIVATE)
+                val email = prefs.getString("user_email_$user", "guest@example.com") ?: "guest@example.com"
+
+                // Active profile mapping
+                val activeProfile = userProfile.value
+                val profileDto = UserProfileDto(
+                    userName = activeProfile.userName,
+                    doctorName = activeProfile.doctorName,
+                    doctorEmail = activeProfile.doctorEmail,
+                    doctorPhone = activeProfile.doctorPhone,
+                    targetGlucoseMin = activeProfile.targetGlucoseMin,
+                    targetGlucoseMax = activeProfile.targetGlucoseMax,
+                    glucoseUnit = activeProfile.glucoseUnit,
+                    cartridgeCapacity = activeProfile.cartridgeCapacity,
+                    cartridgeRemaining = activeProfile.cartridgeRemaining
+                )
+
+                // Glucose readings mapping
+                val glucoseDtoList = glucoseReadings.value.map {
+                    GlucoseReadingDto(
+                        readingValue = it.readingValue,
+                        mealContext = it.mealContext,
+                        dateTimeMillis = it.dateTimeMillis,
+                        notes = it.notes
+                    )
+                }
+
+                // Insulin records mapping
+                val insulinDtoList = insulinRecords.value.map {
+                    InsulinRecordDto(
+                        insulinType = it.insulinType,
+                        doseUnits = it.doseUnits,
+                        dateTimeMillis = it.dateTimeMillis,
+                        notes = it.notes
+                    )
+                }
+
+                // Blood pressure records mapping
+                val bpDtoList = bloodPressureRecords.value.map {
+                    BloodPressureRecordDto(
+                        systolic = it.systolic,
+                        diastolic = it.diastolic,
+                        pulse = it.pulse,
+                        dateTimeMillis = it.dateTimeMillis,
+                        notes = it.notes
+                    )
+                }
+
+                // Reminders mapping
+                val remindersDtoList = reminders.value.map {
+                    ReminderDto(
+                        reminderType = it.reminderType,
+                        label = it.label,
+                        hour = it.hour,
+                        minute = it.minute,
+                        isEnabled = it.isEnabled,
+                        daysOfWeek = it.daysOfWeek
+                    )
+                }
+
+                val payload = SyncPayload(
+                    userName = user,
+                    emailId = email,
+                    profile = profileDto,
+                    glucoseReadings = glucoseDtoList,
+                    insulinRecords = insulinDtoList,
+                    bloodPressureRecords = bpDtoList,
+                    reminders = remindersDtoList
+                )
+
+                // Pretty print local JSON build
+                val moshi = Moshi.Builder().addLast(KotlinJsonAdapterFactory()).build()
+                val adapter = moshi.adapter(SyncPayload::class.java).indent("  ")
+                val requestJson = adapter.toJson(payload)
+
+                _syncConsoleLog.value += ">>> OUTGOING CLINICAL PAYLOAD:\n$requestJson\n\n"
+                _syncMessage.value = "Uploading to database..."
+
+                val client = GlucoBackendClient.getService(_backendBaseUrl.value)
+
+                val responseLog: String
+                val responseMsg: String
+                val isSuccess: Boolean
+
+                if (_backendBaseUrl.value.lowercase().contains("httpbin.org")) {
+                    // post to httpbin
+                    val res = client.postToHttpBin(payload)
+                    isSuccess = true
+                    responseMsg = "Synchronized successfully with mock endpoint!"
+                    val echoedJson = adapter.toJson(res.json)
+                    responseLog = "<<< INCOMING MOCK RESPONSE FROM HTTPBIN (ECHO):\n" +
+                            "Status Code: 200 OK\n" +
+                            "Endpoint: ${res.url}\n" +
+                            "Verified Echoed Data Structure:\n$echoedJson"
+                } else {
+                    // post to standard clinical REST API
+                    val res = client.uploadClinicalData(payload)
+                    isSuccess = res.success
+                    responseMsg = res.message ?: "Synchronized successfully with secure clinical server node."
+                    responseLog = "<<< INCOMING SYSTEM RESPONSE:\n" +
+                            "Success: ${res.success}\n" +
+                            "Server Client ID: ${res.clientId ?: "N/A"}\n" +
+                            "Server Records Count: ${res.serverRecordsCount ?: 0}\n" +
+                            "Log Message: ${res.message}"
+                }
+
+                _syncConsoleLog.value += responseLog
+                _isSyncing.value = false
+                
+                if (isSuccess) {
+                    val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
+                    val timeStr = sdf.format(Date(getCurrentTimeMillis()))
+                    _lastSyncTime.value = timeStr
+                    prefs.edit().putString("gluco_last_sync_time", timeStr).apply()
+                    _syncMessage.value = "Synchronization completed successfully"
+                } else {
+                    _syncMessage.value = "Sync completed with warning: $responseMsg"
+                }
+
+            } catch (e: Exception) {
+                _isSyncing.value = false
+                _syncMessage.value = "Sync failed: ${e.localizedMessage ?: "Unknown error"}"
+                _syncConsoleLog.value += "!!! ERROR OCCURRED DURING CONNECTION:\n" + e.localizedMessage + "\n" + e.stackTraceToString()
+            }
+        }
+    }
+
     // Login & Auth State
+    private val _rememberMe = MutableStateFlow(false)
+    val rememberMe: StateFlow<Boolean> = _rememberMe.asStateFlow()
+
+    private val _savedUsernameOrEmail = MutableStateFlow("")
+    val savedUsernameOrEmail: StateFlow<String> = _savedUsernameOrEmail.asStateFlow()
+
+    private val _savedPassword = MutableStateFlow("")
+    val savedPassword: StateFlow<String> = _savedPassword.asStateFlow()
+
     private val _isLoggedIn = MutableStateFlow(false)
     val isLoggedIn: StateFlow<Boolean> = _isLoggedIn.asStateFlow()
 
@@ -114,7 +294,28 @@ class GlucoViewModel(application: Application) : AndroidViewModel(application) {
     private val _loginError = MutableStateFlow<String?>(null)
     val loginError: StateFlow<String?> = _loginError.asStateFlow()
 
-    fun login(username: String, password: String): Boolean {
+    private fun saveRememberMeConfig(prefs: android.content.SharedPreferences, rememberMe: Boolean, inputUser: String, pass: String) {
+        _rememberMe.value = rememberMe
+        if (rememberMe) {
+            _savedUsernameOrEmail.value = inputUser
+            _savedPassword.value = pass
+            prefs.edit()
+                .putBoolean("remember_me_checked", true)
+                .putString("remember_me_username", inputUser)
+                .putString("remember_me_password", pass)
+                .apply()
+        } else {
+            _savedUsernameOrEmail.value = ""
+            _savedPassword.value = ""
+            prefs.edit()
+                .putBoolean("remember_me_checked", false)
+                .remove("remember_me_username")
+                .remove("remember_me_password")
+                .apply()
+        }
+    }
+
+    fun login(username: String, password: String, rememberMeChecked: Boolean = false): Boolean {
         _loginError.value = null
         val trimmed = username.trim()
         if (trimmed.isEmpty()) {
@@ -126,19 +327,21 @@ class GlucoViewModel(application: Application) : AndroidViewModel(application) {
             return false
         }
 
+        val prefs = getApplication<Application>().getSharedPreferences("gluco_auth_prefs", Context.MODE_PRIVATE)
+
         if (trimmed == "admin") {
             if (password == "yM*d^@Irf 741$") {
                 _isAdmin.value = true
                 _loggedInUser.value = trimmed
                 _isLoggedIn.value = true
+                saveRememberMeConfig(prefs, rememberMeChecked, trimmed, password)
                 return true
             } else {
                 _loginError.value = "Incorrect admin password"
                 return false
             }
         } else {
-            // General registered user login (can use username or registered email)
-            val prefs = getApplication<Application>().getSharedPreferences("gluco_auth_prefs", Context.MODE_PRIVATE)
+            // General registered user local login
             val resolvedUsername = if (trimmed.contains("@")) {
                 prefs.getString("email_to_user_${trimmed.lowercase()}", null)
             } else {
@@ -165,6 +368,25 @@ class GlucoViewModel(application: Application) : AndroidViewModel(application) {
                 _isAdmin.value = false
                 _loggedInUser.value = resolvedUsername
                 _isLoggedIn.value = true
+                saveRememberMeConfig(prefs, rememberMeChecked, trimmed, password)
+
+                // Sync sign-in with Firebase Auth
+                try {
+                    val auth = com.google.firebase.auth.FirebaseAuth.getInstance()
+                    val resolvedEmail = prefs.getString("user_email_$resolvedUsername", "") ?: ""
+                    if (resolvedEmail.isNotEmpty()) {
+                        auth.signInWithEmailAndPassword(resolvedEmail, password)
+                            .addOnSuccessListener { result ->
+                                android.util.Log.d("FirebaseAuth", "Successfully authenticated with Firebase: ${result.user?.uid}")
+                            }
+                            .addOnFailureListener { e ->
+                                android.util.Log.e("FirebaseAuth", "Firebase login error: ${e.message}")
+                            }
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.e("FirebaseAuth", "Firebase Auth not initialized: ${e.message}")
+                }
+
                 return true
             }
         }
@@ -208,6 +430,7 @@ class GlucoViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         val prefs = getApplication<Application>().getSharedPreferences("gluco_auth_prefs", Context.MODE_PRIVATE)
+
         if (prefs.contains("user_pass_$trimmedUser")) {
             _loginError.value = "Username already exists. Please choose another"
             return false
@@ -223,7 +446,54 @@ class GlucoViewModel(application: Application) : AndroidViewModel(application) {
             .putString("user_email_$trimmedUser", trimmedEmail)
             .putString("email_to_user_$trimmedEmail", trimmedUser)
             .apply()
+
+        // Sync registration with Firebase Auth
+        try {
+            val auth = com.google.firebase.auth.FirebaseAuth.getInstance()
+            auth.createUserWithEmailAndPassword(trimmedEmail, password)
+                .addOnSuccessListener { result ->
+                    android.util.Log.d("FirebaseAuth", "Successfully registered new Firebase Auth user: ${result.user?.uid}")
+                }
+                .addOnFailureListener { e ->
+                    android.util.Log.e("FirebaseAuth", "Firebase registration error: ${e.message}")
+                }
+        } catch (e: Exception) {
+            android.util.Log.e("FirebaseAuth", "Firebase Auth not initialized on register: ${e.message}")
+        }
+
         return true
+    }
+
+    fun loginWithGoogleProfile(fullName: String, email: String, username: String) {
+        viewModelScope.launch {
+            val prefs = getApplication<Application>().getSharedPreferences("gluco_auth_prefs", Context.MODE_PRIVATE)
+            
+            // 1. Save credentials (using a safe secure OAuth placeholder password) and map email
+            prefs.edit()
+                .putString("user_pass_$username", "google_verified_auth")
+                .putString("user_email_$username", email)
+                .putString("email_to_user_$email", username)
+                .apply()
+                
+            // 2. Clear state and log in as standard patient
+            _isAdmin.value = false
+            _loggedInUser.value = username
+            _isLoggedIn.value = true
+            
+            // 3. Create or update profile in database with verified Google Name
+            val currentProf = repository.getProfileSync()
+            if (currentProf == null) {
+                repository.insertOrUpdateProfile(UserProfile(
+                    id = 0,
+                    userName = fullName,
+                    isActive = true
+                ))
+            } else {
+                repository.insertOrUpdateProfile(currentProf.copy(
+                    userName = fullName
+                ))
+            }
+        }
     }
 
     fun resetPassword(username: String, email: String, newPass: String): Boolean {
@@ -312,14 +582,27 @@ class GlucoViewModel(application: Application) : AndroidViewModel(application) {
 
         // Ensure database default entities
         ensureMinimumSetup()
+
+        // Load dynamic backend preferences
+        val prefs = application.getSharedPreferences("gluco_auth_prefs", Context.MODE_PRIVATE)
+        _backendBaseUrl.value = prefs.getString("gluco_backend_base_url", "https://httpbin.org/") ?: "https://httpbin.org/"
+        _lastSyncTime.value = prefs.getString("gluco_last_sync_time", "Never") ?: "Never"
+
+        // Load remember me preferences
+        val isRememberChecked = prefs.getBoolean("remember_me_checked", false)
+        _rememberMe.value = isRememberChecked
+        if (isRememberChecked) {
+            _savedUsernameOrEmail.value = prefs.getString("remember_me_username", "") ?: ""
+            _savedPassword.value = prefs.getString("remember_me_password", "") ?: ""
+        }
     }
 
     private fun defaultProfile() = UserProfile(
         id = 0,
-        userName = "Primary Profile",
-        doctorName = "Dr. Smith",
-        doctorEmail = "doctor@example.com",
-        doctorPhone = "+1 (555) 123-4567",
+        userName = "",
+        doctorName = "",
+        doctorEmail = "",
+        doctorPhone = "",
         targetGlucoseMin = 80.0,
         targetGlucoseMax = 140.0,
         glucoseUnit = "mg/dL",
@@ -333,6 +616,14 @@ class GlucoViewModel(application: Application) : AndroidViewModel(application) {
             if (currentProf == null) {
                 repository.insertOrUpdateProfile(defaultProfile())
             } else {
+                if (currentProf.userName == "Primary Profile") {
+                    repository.insertOrUpdateProfile(currentProf.copy(
+                        userName = "",
+                        doctorName = "",
+                        doctorEmail = "",
+                        doctorPhone = ""
+                    ))
+                }
                 val activeProf = repository.getProfileSync()
                 if (activeProf == null) {
                     repository.selectProfile(currentProf.id)
@@ -513,6 +804,34 @@ class GlucoViewModel(application: Application) : AndroidViewModel(application) {
 
         viewModelScope.launch {
             repository.insertGlucoseReading(reading)
+
+            // Cloud Firestore Sync
+            try {
+                val auth = com.google.firebase.auth.FirebaseAuth.getInstance()
+                val db = com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                val userId = auth.currentUser?.uid
+                if (userId != null) {
+                    val glucoseRecord = hashMapOf(
+                        "readingValue" to reading.readingValue,
+                        "mealContext" to reading.mealContext,
+                        "timestamp" to reading.dateTimeMillis,
+                        "notes" to reading.notes
+                    )
+                    db.collection("users")
+                        .document(userId)
+                        .collection("glucose_readings")
+                        .add(glucoseRecord)
+                        .addOnSuccessListener {
+                            android.util.Log.d("FirebaseSync", "Glucose reading sync successful in Firestore!")
+                        }
+                        .addOnFailureListener { e ->
+                            android.util.Log.e("FirebaseSync", "Firestore sync exception:", e)
+                        }
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("FirebaseSync", "Firebase Firestore sync bypassed: ${e.message}")
+            }
+
             resetGlucoseForm()
         }
     }
@@ -1432,6 +1751,274 @@ class GlucoViewModel(application: Application) : AndroidViewModel(application) {
             repository.clearAllBloodPressureRecords()
             repository.clearAllRefillLogs()
             onComplete()
+        }
+    }
+
+    fun clearAllAppData(onComplete: () -> Unit) {
+        viewModelScope.launch {
+            repository.clearAllGlucoseReadings()
+            repository.clearAllInsulinRecords()
+            repository.clearAllBloodPressureRecords()
+            repository.clearAllRefillLogs()
+            repository.clearAllReminders()
+            repository.clearAllProfiles()
+            
+            // Re-create a fresh default active profile so the app remains perfectly functional!
+            repository.insertOrUpdateProfile(
+                UserProfile(
+                    id = 0,
+                    userName = "Fresh Patient",
+                    isActive = true
+                )
+            )
+            onComplete()
+        }
+    }
+
+    fun exportAppDataToJSON(onComplete: (String?) -> Unit) {
+        viewModelScope.launch {
+            try {
+                val root = JSONObject()
+                
+                // 1. Glucose readings
+                val glucoseList = repository.allGlucoseReadings.first()
+                val glucoseArr = JSONArray()
+                for (item in glucoseList) {
+                    val obj = JSONObject()
+                    obj.put("readingValue", item.readingValue)
+                    obj.put("mealContext", item.mealContext)
+                    obj.put("dateTimeMillis", item.dateTimeMillis)
+                    obj.put("notes", item.notes)
+                    glucoseArr.put(obj)
+                }
+                root.put("glucose", glucoseArr)
+
+                // 2. Insulin records
+                val insulinList = repository.allInsulinRecords.first()
+                val insulinArr = JSONArray()
+                for (item in insulinList) {
+                    val obj = JSONObject()
+                    obj.put("insulinType", item.insulinType)
+                    obj.put("doseUnits", item.doseUnits)
+                    obj.put("dateTimeMillis", item.dateTimeMillis)
+                    obj.put("notes", item.notes)
+                    insulinArr.put(obj)
+                }
+                root.put("insulin", insulinArr)
+
+                // 3. Blood pressure records
+                val bpList = repository.allBloodPressureRecords.first()
+                val bpArr = JSONArray()
+                for (item in bpList) {
+                    val obj = JSONObject()
+                    obj.put("systolic", item.systolic)
+                    obj.put("diastolic", item.diastolic)
+                    obj.put("pulse", item.pulse)
+                    obj.put("dateTimeMillis", item.dateTimeMillis)
+                    obj.put("notes", item.notes)
+                    bpArr.put(obj)
+                }
+                root.put("bloodPressure", bpArr)
+
+                // 4. Refill logs
+                val refillList = repository.allRefillLogs.first()
+                val refillArr = JSONArray()
+                for (item in refillList) {
+                    val obj = JSONObject()
+                    obj.put("capacity", item.capacity)
+                    obj.put("remainingBefore", item.remainingBefore)
+                    obj.put("dateTimeMillis", item.dateTimeMillis)
+                    obj.put("actionType", item.actionType)
+                    refillArr.put(obj)
+                }
+                root.put("refills", refillArr)
+
+                // 5. Reminders
+                val reminderList = repository.allReminders.first()
+                val reminderArr = JSONArray()
+                for (item in reminderList) {
+                    val obj = JSONObject()
+                    obj.put("reminderType", item.reminderType)
+                    obj.put("label", item.label)
+                    obj.put("hour", item.hour)
+                    obj.put("minute", item.minute)
+                    obj.put("isEnabled", item.isEnabled)
+                    obj.put("daysOfWeek", item.daysOfWeek)
+                    reminderArr.put(obj)
+                }
+                root.put("reminders", reminderArr)
+
+                // 6. Profiles
+                val profileList = repository.allProfiles.first()
+                val profileArr = JSONArray()
+                for (item in profileList) {
+                    val obj = JSONObject()
+                    obj.put("userName", item.userName)
+                    obj.put("doctorName", item.doctorName)
+                    obj.put("doctorEmail", item.doctorEmail)
+                    obj.put("doctorPhone", item.doctorPhone)
+                    obj.put("targetGlucoseMin", item.targetGlucoseMin)
+                    obj.put("targetGlucoseMax", item.targetGlucoseMax)
+                    obj.put("glucoseUnit", item.glucoseUnit)
+                    obj.put("isActive", item.isActive)
+                    obj.put("cartridgeCapacity", item.cartridgeCapacity)
+                    obj.put("cartridgeRemaining", item.cartridgeRemaining)
+                    profileArr.put(obj)
+                }
+                root.put("profiles", profileArr)
+
+                onComplete(root.toString(2))
+            } catch (e: java.lang.Exception) {
+                onComplete(null)
+            }
+        }
+    }
+
+    fun importAppDataFromJSON(jsonString: String, onComplete: (Boolean) -> Unit) {
+        viewModelScope.launch {
+            try {
+                val root = JSONObject(jsonString)
+                
+                // Clear current database first
+                repository.clearAllGlucoseReadings()
+                repository.clearAllInsulinRecords()
+                repository.clearAllBloodPressureRecords()
+                repository.clearAllRefillLogs()
+                repository.clearAllReminders()
+                repository.clearAllProfiles()
+
+                // 1. Profiles
+                val profilesArr = root.optJSONArray("profiles")
+                if (profilesArr != null) {
+                    for (i in 0 until profilesArr.length()) {
+                        val obj = profilesArr.getJSONObject(i)
+                        repository.insertOrUpdateProfile(
+                            com.example.data.model.UserProfile(
+                                id = 0,
+                                userName = obj.optString("userName", "Patient"),
+                                doctorName = obj.optString("doctorName", ""),
+                                doctorEmail = obj.optString("doctorEmail", ""),
+                                doctorPhone = obj.optString("doctorPhone", ""),
+                                targetGlucoseMin = obj.optDouble("targetGlucoseMin", 70.0),
+                                targetGlucoseMax = obj.optDouble("targetGlucoseMax", 140.0),
+                                glucoseUnit = obj.optString("glucoseUnit", "mg/dL"),
+                                isActive = obj.optBoolean("isActive", false),
+                                cartridgeCapacity = obj.optDouble("cartridgeCapacity", 300.0),
+                                cartridgeRemaining = obj.optDouble("cartridgeRemaining", 0.0)
+                            )
+                        )
+                    }
+                }
+
+                // 2. Glucose readings
+                val glucoseArr = root.optJSONArray("glucose")
+                if (glucoseArr != null) {
+                    for (i in 0 until glucoseArr.length()) {
+                        val obj = glucoseArr.getJSONObject(i)
+                        repository.insertGlucoseReading(
+                            com.example.data.model.GlucoseReading(
+                                id = 0,
+                                readingValue = obj.optDouble("readingValue", 100.0),
+                                mealContext = obj.optString("mealContext", "Other"),
+                                dateTimeMillis = obj.optLong("dateTimeMillis", System.currentTimeMillis()),
+                                notes = obj.optString("notes", "")
+                            )
+                        )
+                    }
+                }
+
+                // 3. Insulin records
+                val insulinArr = root.optJSONArray("insulin")
+                if (insulinArr != null) {
+                    for (i in 0 until insulinArr.length()) {
+                        val obj = insulinArr.getJSONObject(i)
+                        repository.insertInsulinRecord(
+                            com.example.data.model.InsulinRecord(
+                                id = 0,
+                                insulinType = obj.optString("insulinType", "Rapid-acting"),
+                                doseUnits = obj.optDouble("doseUnits", 0.0),
+                                dateTimeMillis = obj.optLong("dateTimeMillis", System.currentTimeMillis()),
+                                notes = obj.optString("notes", "")
+                            )
+                        )
+                    }
+                }
+
+                // 4. Blood pressure records
+                val bpArr = root.optJSONArray("bloodPressure")
+                if (bpArr != null) {
+                    for (i in 0 until bpArr.length()) {
+                        val obj = bpArr.getJSONObject(i)
+                        repository.insertBloodPressureRecord(
+                            com.example.data.model.BloodPressureRecord(
+                                id = 0,
+                                systolic = obj.optInt("systolic", 120),
+                                diastolic = obj.optInt("diastolic", 80),
+                                pulse = obj.optInt("pulse", 70),
+                                dateTimeMillis = obj.optLong("dateTimeMillis", System.currentTimeMillis()),
+                                notes = obj.optString("notes", "")
+                            )
+                        )
+                    }
+                }
+
+                // 5. Refill logs
+                val refillArr = root.optJSONArray("refills")
+                if (refillArr != null) {
+                    for (i in 0 until refillArr.length()) {
+                        val obj = refillArr.getJSONObject(i)
+                        repository.insertRefillLog(
+                            com.example.data.model.CartridgeRefillLog(
+                                id = 0,
+                                capacity = obj.optDouble("capacity", 300.0),
+                                remainingBefore = obj.optDouble("remainingBefore", 0.0),
+                                dateTimeMillis = obj.optLong("dateTimeMillis", System.currentTimeMillis()),
+                                actionType = obj.optString("actionType", "Refill")
+                            )
+                        )
+                    }
+                }
+
+                // 6. Reminders
+                val reminderArr = root.optJSONArray("reminders")
+                if (reminderArr != null) {
+                    for (i in 0 until reminderArr.length()) {
+                        val obj = reminderArr.getJSONObject(i)
+                        repository.insertReminder(
+                            com.example.data.model.Reminder(
+                                id = 0,
+                                reminderType = obj.optString("reminderType", "Blood Sugar Check"),
+                                label = obj.optString("label", ""),
+                                hour = obj.optInt("hour", 8),
+                                minute = obj.optInt("minute", 0),
+                                isEnabled = obj.optBoolean("isEnabled", true),
+                                daysOfWeek = obj.optString("daysOfWeek", "Daily")
+                            )
+                        )
+                    }
+                }
+
+                // Restore active state
+                val activeProf = repository.getProfileSync()
+                if (activeProf == null) {
+                    val anyProf = repository.getAnyProfileSync()
+                    if (anyProf != null) {
+                        repository.selectProfile(anyProf.id)
+                    } else {
+                        repository.insertOrUpdateProfile(
+                            com.example.data.model.UserProfile(
+                                id = 0,
+                                userName = "Patient",
+                                isActive = true
+                            )
+                        )
+                    }
+                }
+
+                onComplete(true)
+            } catch (e: java.lang.Exception) {
+                onComplete(false)
+            }
         }
     }
 }

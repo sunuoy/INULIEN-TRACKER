@@ -61,6 +61,9 @@ interface ReminderDao {
 
     @Query("UPDATE reminders SET isEnabled = :isEnabled WHERE id = :id")
     suspend fun updateReminderStatus(id: Long, isEnabled: Boolean)
+
+    @Query("DELETE FROM reminders")
+    suspend fun clearAllReminders()
 }
 
 @Dao
@@ -88,6 +91,9 @@ interface ProfileDao {
 
     @Query("UPDATE user_profiles SET isActive = 1 WHERE id = :id")
     suspend fun activateProfile(id: Int)
+
+    @Query("DELETE FROM user_profiles")
+    suspend fun clearAllProfiles()
 }
 
 @Dao

@@ -13,44 +13,44 @@ import androidx.compose.ui.platform.LocalContext
 
 private val DarkColorScheme =
   darkColorScheme(
-    primary = NatDarkPrimary,
-    onPrimary = NatDarkOnPrimary,
-    primaryContainer = NatDarkPrimaryContainer,
-    onPrimaryContainer = NatDarkOnPrimaryContainer,
-    secondary = NatDarkPrimary,
-    secondaryContainer = NatDarkSecondaryContainer,
-    onSecondaryContainer = NatDarkOnSecondaryContainer,
-    tertiary = NatDarkPrimary,
-    tertiaryContainer = NatDarkTertiaryContainer,
-    onTertiaryContainer = NatDarkOnTertiaryContainer,
-    background = NatDarkBg,
-    onBackground = NatDarkText,
-    surface = Color(0xFF232520),
-    onSurface = NatDarkText,
-    surfaceVariant = NatDarkTertiaryContainer,
-    onSurfaceVariant = NatDarkText,
-    outline = NatDarkMuted
+    primary = OceanDarkPrimary,
+    onPrimary = OceanDarkOnPrimary,
+    primaryContainer = OceanDarkPrimaryContainer,
+    onPrimaryContainer = OceanDarkOnPrimaryContainer,
+    secondary = OceanDarkPrimary,
+    secondaryContainer = OceanDarkSecondaryContainer,
+    onSecondaryContainer = OceanDarkOnSecondaryContainer,
+    tertiary = OceanDarkPrimary,
+    tertiaryContainer = OceanDarkTertiaryContainer,
+    onTertiaryContainer = OceanDarkOnTertiaryContainer,
+    background = OceanDarkBg,
+    onBackground = OceanDarkText,
+    surface = Color(0xFF191C20),
+    onSurface = OceanDarkText,
+    surfaceVariant = OceanDarkSecondaryContainer,
+    onSurfaceVariant = OceanDarkText,
+    outline = OceanDarkMuted
   )
 
 private val LightColorScheme =
   lightColorScheme(
-    primary = NatPrimary,
+    primary = OceanPrimary,
     onPrimary = Color.White,
-    primaryContainer = NatPrimaryContainer,
-    onPrimaryContainer = NatOnPrimaryContainer,
-    secondary = NatTertiary,
-    secondaryContainer = NatSecondaryContainer,
-    onSecondaryContainer = NatOnSecondaryContainer,
-    tertiary = NatTertiary,
-    tertiaryContainer = NatTertiaryContainer,
-    onTertiaryContainer = NatOnTertiaryContainer,
-    background = NatBg,
-    onBackground = NatText,
+    primaryContainer = OceanPrimaryContainer,
+    onPrimaryContainer = OceanOnPrimaryContainer,
+    secondary = OceanSecondary,
+    secondaryContainer = OceanSecondaryContainer,
+    onSecondaryContainer = OceanOnSecondaryContainer,
+    tertiary = OceanSecondary,
+    tertiaryContainer = OceanTertiaryContainer,
+    onTertiaryContainer = OceanOnTertiaryContainer,
+    background = OceanBg,
+    onBackground = OceanText,
     surface = Color.White,
-    onSurface = NatText,
-    surfaceVariant = NatNavbarBg,
-    onSurfaceVariant = NatMuted,
-    outline = NatMutedText
+    onSurface = OceanText,
+    surfaceVariant = OceanNavbarBg,
+    onSurfaceVariant = OceanMuted,
+    outline = OceanMutedText
   )
 
 @Composable

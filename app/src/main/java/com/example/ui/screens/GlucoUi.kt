@@ -5,8 +5,10 @@ import androidx.compose.animation.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -177,6 +179,10 @@ fun GlucoAppLayout(viewModel: GlucoViewModel) {
                 )
                 AppScreen.REPORTS -> ReportsScreen(viewModel = viewModel)
                 AppScreen.PROFILE -> ProfileScreen(viewModel = viewModel)
+                AppScreen.SETTINGS -> SettingsScreen(
+                    viewModel = viewModel,
+                    onBackClick = { viewModel.navigateTo(AppScreen.PROFILE) }
+                )
             }
         }
     }
@@ -240,14 +246,20 @@ fun GlucoAppLayout(viewModel: GlucoViewModel) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LoginScreen(viewModel: GlucoViewModel) {
-    var username by remember { mutableStateOf("") }
+    val storedRememberMe by viewModel.rememberMe.collectAsStateWithLifecycle()
+    val storedUsername by viewModel.savedUsernameOrEmail.collectAsStateWithLifecycle()
+    val storedPassword by viewModel.savedPassword.collectAsStateWithLifecycle()
+
+    var username by remember(storedUsername) { mutableStateOf(storedUsername) }
     var email by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
+    var password by remember(storedPassword) { mutableStateOf(storedPassword) }
+    var isRememberMeChecked by remember(storedRememberMe) { mutableStateOf(storedRememberMe) }
     var confirmPassword by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
     var confirmPasswordVisible by remember { mutableStateOf(false) }
     var isRegisterMode by remember { mutableStateOf(false) }
     var showForgotPasswordDialog by remember { mutableStateOf(false) }
+    var showGoogleSignInDialog by remember { mutableStateOf(false) }
     val loginError by viewModel.loginError.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
@@ -549,8 +561,26 @@ fun LoginScreen(viewModel: GlucoViewModel) {
                     if (!isRegisterMode) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.End
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                modifier = Modifier.clickable { isRememberMeChecked = !isRememberMeChecked }
+                            ) {
+                                Checkbox(
+                                    checked = isRememberMeChecked,
+                                    onCheckedChange = { isRememberMeChecked = it },
+                                    modifier = Modifier.testTag("remember_me_checkbox")
+                                )
+                                Text(
+                                    text = "Remember me",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+
                             TextButton(
                                 onClick = { showForgotPasswordDialog = true },
                                 modifier = Modifier.testTag("forgot_password_button"),
@@ -630,7 +660,7 @@ fun LoginScreen(viewModel: GlucoViewModel) {
                                 }
                             }
                         } else {
-                            val success = viewModel.login(username, password)
+                            val success = viewModel.login(username, password, isRememberMeChecked)
                             if (success) {
                                 android.widget.Toast.makeText(context, "Successfully authorized!", android.widget.Toast.LENGTH_SHORT).show()
                             }
@@ -647,6 +677,48 @@ fun LoginScreen(viewModel: GlucoViewModel) {
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
+                }
+
+                // OR Divider for third party options
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Divider(modifier = Modifier.weight(1f), thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
+                    Text(
+                        text = "Or continue with",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.outline,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Divider(modifier = Modifier.weight(1f), thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
+                }
+
+                // Sign in with Google Button
+                OutlinedButton(
+                    onClick = { showGoogleSignInDialog = true },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp)
+                        .testTag("google_login_button"),
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                    colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.surface)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        GoogleLogoIcon(modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text(
+                            text = "Sign in with Google",
+                            color = MaterialTheme.colorScheme.onSurface,
+                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
                 }
 
                 // Switch between login and signup modes
@@ -714,6 +786,424 @@ fun LoginScreen(viewModel: GlucoViewModel) {
             }
         }
     }
+
+    if (showGoogleSignInDialog) {
+        GoogleSignInDialog(
+            onDismiss = { showGoogleSignInDialog = false },
+            onSignInSuccess = { fullName, email, username ->
+                viewModel.loginWithGoogleProfile(fullName, email, username)
+                showGoogleSignInDialog = false
+            }
+        )
+    }
+}
+
+@Composable
+fun GoogleLogoIcon(modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier.size(18.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val center = size / 2.0f
+            val radius = size.minDimension / 2.0f
+            
+            drawArc(
+                color = Color(0xFFEA4335), // Red
+                startAngle = 180f,
+                sweepAngle = 90f,
+                useCenter = true
+            )
+            drawArc(
+                color = Color(0xFFFBBC05), // Yellow
+                startAngle = 90f,
+                sweepAngle = 90f,
+                useCenter = true
+            )
+            drawArc(
+                color = Color(0xFF34A853), // Green
+                startAngle = 0f,
+                sweepAngle = 90f,
+                useCenter = true
+            )
+            drawArc(
+                color = Color(0xFF4285F4), // Blue
+                startAngle = 270f,
+                sweepAngle = 90f,
+                useCenter = true
+            )
+        }
+        Text(
+            text = "G",
+            color = Color.White,
+            fontWeight = FontWeight.Black,
+            fontSize = 11.sp,
+            textAlign = TextAlign.Center
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun GoogleSignInDialog(
+    onDismiss: () -> Unit,
+    onSignInSuccess: (fullName: String, email: String, username: String) -> Unit
+) {
+    var step by remember { mutableIntStateOf(1) } // 1: Choose account, 2: OTP, 3: Success
+
+    var fullName by remember { mutableStateOf("") }
+    var emailId by remember { mutableStateOf("") }
+    var userName by remember { mutableStateOf("") }
+    
+    var otpInput by remember { mutableStateOf("") }
+    var generatedOtp by remember { mutableStateOf("") }
+    var otpError by remember { mutableStateOf("") }
+    var timerSeconds by remember { mutableIntStateOf(30) }
+    
+    val context = LocalContext.current
+    
+    LaunchedEffect(step) {
+        if (step == 2) {
+            val code = (100000..999999).random().toString()
+            generatedOtp = code
+            android.widget.Toast.makeText(
+                context,
+                "🔔 Gmail: GlucoLog verification code is $code (valid for 5 minutes)",
+                android.widget.Toast.LENGTH_LONG
+            ).show()
+        }
+    }
+    
+    LaunchedEffect(step, timerSeconds) {
+        if (step == 2 && timerSeconds > 0) {
+            delay(1000L)
+            timerSeconds--
+        }
+    }
+
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(8.dp)
+                .testTag("google_signin_dialog"),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            elevation = CardDefaults.cardElevation(12.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.padding(bottom = 4.dp)
+                ) {
+                    GoogleLogoIcon(modifier = Modifier.size(24.dp))
+                    Text(
+                        text = "Google",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+
+                if (step == 1) {
+                    Text(
+                        text = "Sign in with Google",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center
+                    )
+                    Text(
+                        text = "Choose a detected account or configure custom email profile parameters.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.outline,
+                        textAlign = TextAlign.Center
+                    )
+
+                    var isCustomAccountMode by remember { mutableStateOf(false) }
+
+                    if (!isCustomAccountMode) {
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Card(
+                                onClick = {
+                                    fullName = "Younus M33"
+                                    emailId = "younusM33@gmail.com"
+                                    userName = "youns"
+                                    step = 2
+                                },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("google_account_younus"),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f))
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(40.dp)
+                                            .background(MaterialTheme.colorScheme.primary, CircleShape),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text("Y", color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold)
+                                    }
+                                    Column {
+                                        Text("Younus M33", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+                                        Text("younusM33@gmail.com", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
+                                    }
+                                }
+                            }
+
+                            Card(
+                                onClick = {
+                                    fullName = "Primary Patient"
+                                    emailId = "patient@gmail.com"
+                                    userName = "patient"
+                                    step = 2
+                                },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("google_account_patient"),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f))
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(40.dp)
+                                            .background(MaterialTheme.colorScheme.secondary, CircleShape),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text("P", color = MaterialTheme.colorScheme.onSecondary, fontWeight = FontWeight.Bold)
+                                    }
+                                    Column {
+                                        Text("Primary Patient", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+                                        Text("patient@gmail.com", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
+                                    }
+                                }
+                            }
+
+                            OutlinedButton(
+                                onClick = { isCustomAccountMode = true },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 8.dp)
+                                    .testTag("use_different_gmail_button"),
+                                shape = RoundedCornerShape(10.dp)
+                            ) {
+                                Icon(Icons.Default.Add, contentDescription = "Add account")
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Use another Gmail account")
+                            }
+                        }
+                    } else {
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            OutlinedTextField(
+                                value = fullName,
+                                onValueChange = { fullName = it },
+                                label = { Text("Full Name") },
+                                placeholder = { Text("e.g. David Miller") },
+                                singleLine = true,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("google_input_full_name"),
+                                shape = RoundedCornerShape(10.dp)
+                            )
+
+                            OutlinedTextField(
+                                value = emailId,
+                                onValueChange = { emailId = it },
+                                label = { Text("Email ID") },
+                                placeholder = { Text("e.g. david.clinical@gmail.com") },
+                                singleLine = true,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("google_input_email"),
+                                shape = RoundedCornerShape(10.dp),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
+                            )
+
+                            OutlinedTextField(
+                                value = userName,
+                                onValueChange = { userName = it },
+                                label = { Text("Username") },
+                                placeholder = { Text("e.g. davidm") },
+                                singleLine = true,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("google_input_username"),
+                                shape = RoundedCornerShape(10.dp)
+                            )
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                TextButton(
+                                    onClick = { isCustomAccountMode = false },
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text("Back")
+                                }
+                                Button(
+                                    onClick = {
+                                        val trimmedEmail = emailId.trim().lowercase()
+                                        if (fullName.trim().isEmpty() || trimmedEmail.isEmpty() || userName.trim().isEmpty()) {
+                                            android.widget.Toast.makeText(context, "Please fill out all fields", android.widget.Toast.LENGTH_SHORT).show()
+                                        } else if (!trimmedEmail.endsWith("@gmail.com")) {
+                                            android.widget.Toast.makeText(context, "Only @gmail.com addresses are supported for Google auth", android.widget.Toast.LENGTH_SHORT).show()
+                                        } else {
+                                            emailId = trimmedEmail
+                                            step = 2
+                                        }
+                                    },
+                                    modifier = Modifier
+                                        .weight(1.5f)
+                                        .testTag("google_custom_next_btn")
+                                ) {
+                                    Text("Next")
+                                }
+                            }
+                        }
+                    }
+                } else if (step == 2) {
+                    Text(
+                        text = "Verify your email",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center
+                    )
+                    Text(
+                        text = "A 6-digit confirmation OTP has been transmitted to $emailId to secure registration parameters.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center
+                    )
+
+                    OutlinedTextField(
+                        value = otpInput,
+                        onValueChange = { 
+                            if (it.length <= 6) {
+                                otpInput = it
+                                otpError = ""
+                            }
+                        },
+                        label = { Text("6-Digit OTP Code") },
+                        placeholder = { Text("Enter OTP code") },
+                        singleLine = true,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("google_otp_input"),
+                        shape = RoundedCornerShape(12.dp),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        textStyle = androidx.compose.ui.text.TextStyle(textAlign = TextAlign.Center)
+                    )
+
+                    if (otpError.isNotEmpty()) {
+                        Text(
+                            text = otpError,
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        TextButton(
+                            onClick = {
+                                if (timerSeconds == 0) {
+                                    timerSeconds = 30
+                                    val code = (100000..999999).random().toString()
+                                    generatedOtp = code
+                                    android.widget.Toast.makeText(
+                                        context,
+                                        "🔔 Gmail: New verification code is $code",
+                                        android.widget.Toast.LENGTH_LONG
+                                    ).show()
+                                }
+                            },
+                            enabled = timerSeconds == 0,
+                            modifier = Modifier.testTag("google_resend_otp_btn")
+                        ) {
+                            Text(
+                                if (timerSeconds > 0) "Resend code in ${timerSeconds}s" else "Resend code"
+                            )
+                        }
+
+                        Button(
+                            onClick = {
+                                if (otpInput == generatedOtp) {
+                                    onSignInSuccess(fullName, emailId, userName)
+                                    step = 3
+                                } else {
+                                    otpError = "Invalid verification code. Please check the notification banner."
+                                }
+                            },
+                            modifier = Modifier.testTag("google_verify_otp_btn")
+                        ) {
+                            Text("Verify & Register")
+                        }
+                    }
+                } else if (step == 3) {
+                    Icon(
+                        imageVector = Icons.Default.CheckCircle,
+                        contentDescription = "Success Icon",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(64.dp)
+                    )
+                    Text(
+                        text = "Identity Verified!",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center
+                    )
+                    Text(
+                        text = "Google account linked successfully. Your name, email, and clinical parameters are copied securely.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center
+                    )
+                    
+                    Button(
+                        onClick = onDismiss,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp)
+                            .testTag("google_success_continue_btn")
+                    ) {
+                        Text("Continue to App")
+                    }
+                }
+            }
+        }
+    }
 }
 
 private data class NavigationItem(
@@ -766,12 +1256,53 @@ fun HomeScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = "Clean Stable Health",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Medium,
-                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
-                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            val context = LocalContext.current
+                            val prefs = remember { context.getSharedPreferences("gluco_auth_prefs", android.content.Context.MODE_PRIVATE) }
+                            val avatarIndex = prefs.getInt("profile_avatar_${profile.id}", 0)
+                            val avatarOptions = listOf(
+                                Icons.Default.MedicalServices to Color(0xFF1E88E5), // Blue
+                                Icons.Default.Person to Color(0xFF8E24AA),          // Purple
+                                Icons.Default.Favorite to Color(0xFFE53935),        // Red
+                                Icons.Default.CloudQueue to Color(0xFF00ACC1),      // Teal cyan
+                                Icons.Default.HealthAndSafety to Color(0xFF43A047), // Green
+                                Icons.Default.LocalHospital to Color(0xFFFB8C00)    // Orange
+                            )
+                            val (avatarIcon, avatarColor) = avatarOptions.getOrElse(avatarIndex) { avatarOptions[0] }
+
+                            Box(
+                                modifier = Modifier
+                                    .size(46.dp)
+                                    .background(avatarColor, androidx.compose.foundation.shape.CircleShape)
+                                    .padding(8.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = avatarIcon,
+                                    contentDescription = "Active Profile Picture",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+
+                            Column {
+                                Text(
+                                    text = "Clean Stable Health",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Medium,
+                                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
+                                )
+                                Text(
+                                    text = "Hello, ${profile.userName.ifEmpty { "Health Champion" }}!",
+                                    style = MaterialTheme.typography.headlineSmall,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+
                         IconButton(
                             onClick = { showProfileEditDialog = true },
                             modifier = Modifier.size(36.dp).testTag("home_edit_profile_button")
@@ -784,12 +1315,6 @@ fun HomeScreen(
                             )
                         }
                     }
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "Hello, ${profile.userName.ifEmpty { "Health Champion" }}!",
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.Bold
-                    )
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         text = "Target Range: ${profile.targetGlucoseMin.toInt()}-${profile.targetGlucoseMax.toInt()} ${profile.glucoseUnit}. All entries persist locally.",
@@ -3090,25 +3615,6 @@ fun ProfileScreen(viewModel: GlucoViewModel) {
     val loggedInUser by viewModel.loggedInUser.collectAsStateWithLifecycle()
     val isAdmin by viewModel.isAdmin.collectAsStateWithLifecycle()
 
-    var uName by remember { mutableStateOf(currentProfile.userName) }
-    var dName by remember { mutableStateOf(currentProfile.doctorName) }
-    var dMail by remember { mutableStateOf(currentProfile.doctorEmail) }
-    var dPhone by remember { mutableStateOf(currentProfile.doctorPhone) }
-    var tMin by remember { mutableStateOf(currentProfile.targetGlucoseMin.toString()) }
-    var tMax by remember { mutableStateOf(currentProfile.targetGlucoseMax.toString()) }
-    var gUnit by remember { mutableStateOf(currentProfile.glucoseUnit) }
-
-    // Synchronize to profile changes
-    LaunchedEffect(currentProfile) {
-        uName = currentProfile.userName
-        dName = currentProfile.doctorName
-        dMail = currentProfile.doctorEmail
-        dPhone = currentProfile.doctorPhone
-        tMin = currentProfile.targetGlucoseMin.toString()
-        tMax = currentProfile.targetGlucoseMax.toString()
-        gUnit = currentProfile.glucoseUnit
-    }
-
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -3118,86 +3624,81 @@ fun ProfileScreen(viewModel: GlucoViewModel) {
     ) {
         // Headline
         item {
-            Column {
-                Text(
-                    text = "Clinical Profile",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onBackground
-                )
-                Text(
-                    text = "Quick-switch and edit profiles compactly",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.outline
-                )
-            }
-        }
+            var showMenu by remember { mutableStateOf(false) }
+            val context = LocalContext.current
 
-        // Authentication details (Admin credentials log out card)
-        item {
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("profile_auth_card"),
-                shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.25f))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(14.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text(
-                            text = "Logged in as:",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.outline
-                        )
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Text(
-                                text = loggedInUser.ifEmpty { "Guest Patient" },
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSecondaryContainer
-                            )
-                            if (isAdmin) {
-                                Card(
-                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primary),
-                                    shape = RoundedCornerShape(6.dp)
-                                ) {
-                                    Text(
-                                        text = "ADMIN",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onPrimary,
-                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                            }
-                        }
-                    }
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Clinical Profile",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                    Text(
+                        text = "Quick-switch and edit profiles compactly",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.outline
+                    )
+                }
 
-                    OutlinedButton(
-                        onClick = { viewModel.logout() },
-                        modifier = Modifier.testTag("logout_button"),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.5f)),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                        shape = RoundedCornerShape(8.dp)
+                Box {
+                    IconButton(
+                        onClick = { showMenu = !showMenu },
+                        modifier = Modifier.testTag("profile_dropdown_menu_button")
                     ) {
                         Icon(
-                            imageVector = Icons.Default.ExitToApp,
-                            contentDescription = "Sign Out Icon",
-                            modifier = Modifier.size(16.dp),
-                            tint = MaterialTheme.colorScheme.error
+                            imageVector = Icons.Default.Menu,
+                            contentDescription = "Profile Menu Options",
+                            tint = MaterialTheme.colorScheme.onBackground
                         )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Log Out", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error)
+                    }
+
+                    DropdownMenu(
+                        expanded = showMenu,
+                        onDismissRequest = { showMenu = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = { 
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Icon(
+                                        imageVector = Icons.Default.Settings,
+                                        contentDescription = "Settings",
+                                        tint = MaterialTheme.colorScheme.onSurface,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Text("Settings") 
+                                }
+                            },
+                            onClick = {
+                                showMenu = false
+                                viewModel.navigateTo(AppScreen.SETTINGS)
+                            },
+                            modifier = Modifier.testTag("profile_dropdown_settings_item")
+                        )
+                        DropdownMenuItem(
+                            text = { 
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Icon(
+                                        imageVector = Icons.Default.ExitToApp,
+                                        contentDescription = "Exit App",
+                                        tint = MaterialTheme.colorScheme.error,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Text("Exit App", color = MaterialTheme.colorScheme.error) 
+                                }
+                            },
+                            onClick = {
+                                showMenu = false
+                                val activity = context as? android.app.Activity
+                                activity?.finish()
+                            },
+                            modifier = Modifier.testTag("profile_dropdown_exit_item")
+                        )
                     }
                 }
             }
@@ -3226,10 +3727,23 @@ fun ProfileScreen(viewModel: GlucoViewModel) {
                     ) {
                         items(savedProfiles) { profile ->
                             val isActive = profile.isActive || profile.id == currentProfile.id
+                            val context = LocalContext.current
+                            val prefs = remember { context.getSharedPreferences("gluco_auth_prefs", android.content.Context.MODE_PRIVATE) }
+                            val avatarIndex = prefs.getInt("profile_avatar_${profile.id}", 0)
+                            val avatarOptions = listOf(
+                                Icons.Default.MedicalServices to Color(0xFF1E88E5), // Blue
+                                Icons.Default.Person to Color(0xFF8E24AA),          // Purple
+                                Icons.Default.Favorite to Color(0xFFE53935),        // Red
+                                Icons.Default.CloudQueue to Color(0xFF00ACC1),      // Teal cyan
+                                Icons.Default.HealthAndSafety to Color(0xFF43A047), // Green
+                                Icons.Default.LocalHospital to Color(0xFFFB8C00)    // Orange
+                            )
+                            val (avatarIcon, avatarColor) = avatarOptions.getOrElse(avatarIndex) { avatarOptions[0] }
+
                             Card(
                                 modifier = Modifier
-                                    .width(180.dp)
-                                    .height(98.dp)
+                                    .width(200.dp)
+                                    .height(108.dp)
                                     .clickable { viewModel.selectProfileFlow(profile.id) },
                                 shape = RoundedCornerShape(12.dp),
                                 colors = CardDefaults.cardColors(
@@ -3241,31 +3755,53 @@ fun ProfileScreen(viewModel: GlucoViewModel) {
                                 )
                             ) {
                                 Box(modifier = Modifier.fillMaxSize().padding(10.dp)) {
-                                    Column(
-                                        modifier = Modifier.align(Alignment.TopStart).fillMaxWidth(0.85f),
-                                        verticalArrangement = Arrangement.spacedBy(2.dp)
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        // Patient Name
-                                        Text(
-                                            text = profile.userName,
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            fontWeight = FontWeight.Bold,
-                                            maxLines = 1,
-                                            color = if (isActive) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onBackground
-                                        )
-                                        // Doctor Info
-                                        Text(
-                                            text = "Dr: ${profile.doctorName.ifEmpty { "None" }}",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            maxLines = 1,
-                                            color = if (isActive) MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f) else MaterialTheme.colorScheme.outline
-                                        )
-                                        // Limits
-                                        Text(
-                                            text = "Range: ${profile.targetGlucoseMin.toInt()}-${profile.targetGlucoseMax.toInt()} ${profile.glucoseUnit}",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = if (isActive) MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f) else MaterialTheme.colorScheme.outline
-                                        )
+                                        // Small circular avatar
+                                        Box(
+                                            modifier = Modifier
+                                                .size(36.dp)
+                                                .background(avatarColor, androidx.compose.foundation.shape.CircleShape)
+                                                .padding(6.dp),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                imageVector = avatarIcon,
+                                                contentDescription = "Avatar Icon",
+                                                tint = Color.White,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                        }
+
+                                        Column(
+                                            modifier = Modifier.weight(1f),
+                                            verticalArrangement = Arrangement.spacedBy(2.dp)
+                                        ) {
+                                            // Patient Name
+                                            Text(
+                                                text = profile.userName,
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                fontWeight = FontWeight.Bold,
+                                                maxLines = 1,
+                                                color = if (isActive) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onBackground
+                                            )
+                                            // Doctor Info
+                                            Text(
+                                                text = "Dr: ${profile.doctorName.ifEmpty { "None" }}",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                maxLines = 1,
+                                                color = if (isActive) MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f) else MaterialTheme.colorScheme.outline
+                                            )
+                                            // Limits
+                                            Text(
+                                                text = "Range: ${profile.targetGlucoseMin.toInt()}-${profile.targetGlucoseMax.toInt()} ${profile.glucoseUnit}",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = if (isActive) MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f) else MaterialTheme.colorScheme.outline
+                                            )
+                                        }
                                     }
 
                                     // Active indicator or Delete button
@@ -3302,220 +3838,6 @@ fun ProfileScreen(viewModel: GlucoViewModel) {
                                     }
                                 }
                             }
-                        }
-                    }
-                }
-            }
-        }
-
-        // Compact Profiles Form Card
-        item {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.tertiaryContainer)
-            ) {
-                Column(
-                    modifier = Modifier.padding(14.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Text(
-                        text = "Edit Active Credentials",
-                        fontWeight = FontWeight.Bold,
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-
-                    // Patient and Doctor names side-by-side! (Double-column)
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        OutlinedTextField(
-                            value = uName,
-                            onValueChange = { uName = it },
-                            label = { Text("Patient Name") },
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(10.dp),
-                            singleLine = true
-                        )
-                        OutlinedTextField(
-                            value = dName,
-                            onValueChange = { dName = it },
-                            label = { Text("Doctor Name") },
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(10.dp),
-                            singleLine = true
-                        )
-                    }
-
-                    // Doctor email and Doctor Phone side-by-side! (Double-column)
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        OutlinedTextField(
-                            value = dMail,
-                            onValueChange = { dMail = it },
-                            label = { Text("Doctor Email") },
-                            modifier = Modifier.weight(1.1f),
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-                            shape = RoundedCornerShape(10.dp),
-                            singleLine = true
-                        )
-                        OutlinedTextField(
-                            value = dPhone,
-                            onValueChange = { dPhone = it },
-                            label = { Text("Doctor Phone") },
-                            modifier = Modifier.weight(0.9f),
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-                            shape = RoundedCornerShape(10.dp),
-                            singleLine = true
-                        )
-                    }
-
-                    // Low and High limits + Unit selector side-by-side! (Triple-column)
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        OutlinedTextField(
-                            value = tMin,
-                            onValueChange = { tMin = it },
-                            label = { Text("Low Limit") },
-                            modifier = Modifier.weight(1f),
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                            shape = RoundedCornerShape(10.dp),
-                            singleLine = true
-                        )
-                        OutlinedTextField(
-                            value = tMax,
-                            onValueChange = { tMax = it },
-                            label = { Text("High Limit") },
-                            modifier = Modifier.weight(1f),
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                            shape = RoundedCornerShape(10.dp),
-                            singleLine = true
-                        )
-
-                        // Segmented Control for Units (mg/dL vs mmol/L)
-                        Column(modifier = Modifier.weight(1.2f)) {
-                            Text(
-                                "Unit",
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.outline,
-                                modifier = Modifier.padding(bottom = 2.dp)
-                            )
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(38.dp)
-                                    .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp))
-                                    .padding(2.dp)
-                            ) {
-                                val units = listOf("mg/dL", "mmol/L")
-                                units.forEach { unit ->
-                                    val isSelected = gUnit == unit
-                                    Box(
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .fillMaxHeight()
-                                            .background(
-                                                if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
-                                                RoundedCornerShape(6.dp)
-                                            )
-                                            .clickable { gUnit = unit },
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text(
-                                            text = unit,
-                                            fontSize = 9.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(4.dp))
-
-                    // Buttons Group (Save Changes & Save as New Profile)
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        // Outlined Save as New
-                        OutlinedButton(
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(46.dp),
-                            shape = RoundedCornerShape(12.dp),
-                            onClick = {
-                                val pMin = tMin.toDoubleOrNull() ?: 70.0
-                                val pMax = tMax.toDoubleOrNull() ?: 140.0
-                                viewModel.saveNewProfileFlow(
-                                    UserProfile(
-                                        id = 0,
-                                        userName = uName.ifEmpty { "Patient" },
-                                        doctorName = dName,
-                                        doctorEmail = dMail,
-                                        doctorPhone = dPhone,
-                                        targetGlucoseMin = pMin,
-                                        targetGlucoseMax = pMax,
-                                        glucoseUnit = gUnit,
-                                        isActive = true
-                                    )
-                                )
-                            },
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary)
-                        ) {
-                            Icon(
-                                Icons.Default.Add,
-                                contentDescription = "New Profile Logo",
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Save as New", fontSize = 12.sp, maxLines = 1)
-                        }
-
-                        // Filled Save Changes
-                        Button(
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(46.dp)
-                                .testTag("profile_save_button"),
-                            shape = RoundedCornerShape(12.dp),
-                            onClick = {
-                                val pMin = tMin.toDoubleOrNull() ?: 70.0
-                                val pMax = tMax.toDoubleOrNull() ?: 140.0
-                                viewModel.saveProfile(
-                                    UserProfile(
-                                        id = currentProfile.id,
-                                        userName = uName.ifEmpty { "Patient" },
-                                        doctorName = dName,
-                                        doctorEmail = dMail,
-                                        doctorPhone = dPhone,
-                                        targetGlucoseMin = pMin,
-                                        targetGlucoseMax = pMax,
-                                        glucoseUnit = gUnit,
-                                        isActive = true
-                                    )
-                                )
-                            }
-                        ) {
-                            Icon(
-                                Icons.Default.Save,
-                                contentDescription = "Save Profile Logo",
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Save Active", fontSize = 12.sp, maxLines = 1)
                         }
                     }
                 }
@@ -3717,7 +4039,196 @@ fun ProfileScreen(viewModel: GlucoViewModel) {
                 }
             }
         }
+
+        // Clinical Backend Synchronization DashboardCard
+        item {
+            val isSyncing by viewModel.isSyncing.collectAsStateWithLifecycle()
+            val syncMessage by viewModel.syncMessage.collectAsStateWithLifecycle()
+            val lastSyncTime by viewModel.lastSyncTime.collectAsStateWithLifecycle()
+            val backendUrl by viewModel.backendBaseUrl.collectAsStateWithLifecycle()
+            val syncConsoleLog by viewModel.syncConsoleLog.collectAsStateWithLifecycle()
+
+            var inputUrl by remember { mutableStateOf(backendUrl) }
+            var isConsoleExpanded by remember { mutableStateOf(false) }
+
+            // Sync with profile setting
+            LaunchedEffect(backendUrl) {
+                inputUrl = backendUrl
+            }
+
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("backend_sync_card"),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primaryContainer)
+            ) {
+                Column(
+                    modifier = Modifier.padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Icon(
+                                imageVector = Icons.Default.Cloud,
+                                contentDescription = "Sync Cloud Logo",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                            Text(
+                                text = "Clinical Database Sync",
+                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+
+                        if (isSyncing) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(16.dp),
+                                strokeWidth = 2.dp,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        } else {
+                            Box(
+                                modifier = Modifier
+                                    .background(
+                                        if (lastSyncTime == "Never") MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f) 
+                                        else MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f), 
+                                        RoundedCornerShape(6.dp)
+                                    )
+                                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                            ) {
+                                Text(
+                                    text = if (lastSyncTime == "Never") "NOT SECURED" else "SECURED",
+                                    color = if (lastSyncTime == "Never") MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+
+                    Text(
+                        text = "Synchronize local clinical parameters, logged glucose charts, insulin doses, blood pressure logs, and schedule reminders with your healthcare server network.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.outline
+                    )
+
+                    // URL config text field
+                    OutlinedTextField(
+                        value = inputUrl,
+                        onValueChange = { 
+                            inputUrl = it 
+                            viewModel.setBackendBaseUrl(it)
+                        },
+                        label = { Text("Clinical Service Base URL") },
+                        placeholder = { Text("https://httpbin.org/ or custom clinical api") },
+                        singleLine = true,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("sync_base_url_input"),
+                        shape = RoundedCornerShape(10.dp),
+                        leadingIcon = {
+                            Icon(Icons.Default.Dns, contentDescription = "Server URL Config Icon", modifier = Modifier.size(18.dp))
+                        }
+                    )
+
+                    // Status details card
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(10.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Text("Last Synced:", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                                Text(lastSyncTime, style = MaterialTheme.typography.bodySmall)
+                            }
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Text("Sync Status:", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                                Text(syncMessage ?: "Ready", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
+                            }
+                        }
+                    }
+
+                    Button(
+                        onClick = { viewModel.triggerUploadSync() },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(44.dp)
+                            .testTag("trigger_sync_button"),
+                        shape = RoundedCornerShape(10.dp),
+                        enabled = !isSyncing
+                    ) {
+                        Icon(Icons.Default.CloudUpload, contentDescription = "Backup Database Icon", modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(if (isSyncing) "Synchronizing Logs..." else "Upload Clinical Data", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                    }
+
+                    // Console Log Expansion
+                    if (syncConsoleLog.isNotEmpty()) {
+                        HorizontalDivider(
+                            modifier = Modifier.fillMaxWidth(),
+                            thickness = 1.dp,
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                        )
+
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { isConsoleExpanded = !isConsoleExpanded }
+                                .padding(vertical = 4.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Raw JSON Payload Console Log",
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Icon(
+                                imageVector = if (isConsoleExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                contentDescription = "Toggle payload terminal log",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+
+                        if (isConsoleExpanded) {
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(max = 240.dp),
+                                shape = RoundedCornerShape(8.dp),
+                                colors = CardDefaults.cardColors(containerColor = Color(0xFF19191E)),
+                                border = BorderStroke(1.dp, Color(0xFF2B2B33))
+                            ) {
+                                Column(modifier = Modifier.padding(10.dp)) {
+                                    Text(
+                                        text = syncConsoleLog,
+                                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                        fontSize = 11.sp,
+                                        color = Color(0xFFDCDCAA),
+                                        modifier = Modifier.verticalScroll(rememberScrollState())
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
         
+
+
         item {
             Spacer(modifier = Modifier.height(24.dp))
         }
@@ -4267,8 +4778,16 @@ fun ReminderFormDialog(
 fun ProfileEditDialog(
     currentProfile: UserProfile,
     onDismiss: () -> Unit,
-    onSave: (UserProfile) -> Unit
+    onSave: (UserProfile) -> Unit,
+    onSaveAsNew: ((UserProfile) -> Unit)? = null,
+    loggedInUser: String = "",
+    isAdmin: Boolean = false,
+    onLogout: (() -> Unit)? = null
 ) {
+    val context = LocalContext.current
+    val prefs = remember { context.getSharedPreferences("gluco_auth_prefs", android.content.Context.MODE_PRIVATE) }
+    val linkedEmail = remember(loggedInUser) { prefs.getString("user_email_$loggedInUser", "") ?: "" }
+
     var uName by remember { mutableStateOf(currentProfile.userName) }
     var dName by remember { mutableStateOf(currentProfile.doctorName) }
     var dMail by remember { mutableStateOf(currentProfile.doctorEmail) }
@@ -4289,42 +4808,140 @@ fun ProfileEditDialog(
             Column(
                 modifier = Modifier
                     .padding(20.dp)
-                    .fillMaxWidth(),
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Text(
-                    text = "Edit Active Profile",
+                    text = "Edit Active Credentials",
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
 
-                OutlinedTextField(
-                    value = uName,
-                    onValueChange = { uName = it },
-                    label = { Text("Patient Name") },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(10.dp),
-                    singleLine = true
-                )
+                if (onLogout != null) {
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("profile_auth_card_in_settings"),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.25f))
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text(
+                                    text = "Logged in as:",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.outline
+                                )
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Text(
+                                        text = loggedInUser.ifEmpty { "Guest Patient" },
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                                    )
+                                    if (isAdmin) {
+                                        Card(
+                                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primary),
+                                            shape = RoundedCornerShape(6.dp)
+                                        ) {
+                                            Text(
+                                                text = "ADMIN",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.onPrimary,
+                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
+                                    }
+                                }
 
-                OutlinedTextField(
-                    value = dName,
-                    onValueChange = { dName = it },
-                    label = { Text("Doctor Name") },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(10.dp),
-                    singleLine = true
-                )
+                                if (linkedEmail.isNotEmpty()) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Email,
+                                            contentDescription = "Verified Email",
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(12.dp)
+                                        )
+                                        Text(
+                                            text = linkedEmail,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.primary,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                    }
+                                }
+                            }
 
+                            OutlinedButton(
+                                onClick = onLogout,
+                                modifier = Modifier.testTag("logout_button_settings"),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.5f)),
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.ExitToApp,
+                                    contentDescription = "Sign Out Icon",
+                                    modifier = Modifier.size(16.dp),
+                                    tint = MaterialTheme.colorScheme.error
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Log Out", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error)
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(2.dp))
+                }
+
+                // Patient and Doctor names side-by-side! (Double-column)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    OutlinedTextField(
+                        value = uName,
+                        onValueChange = { uName = it },
+                        label = { Text("Patient Name") },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(10.dp),
+                        singleLine = true
+                    )
+                    OutlinedTextField(
+                        value = dName,
+                        onValueChange = { dName = it },
+                        label = { Text("Doctor Name") },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(10.dp),
+                        singleLine = true
+                    )
+                }
+
+                // Doctor email and Doctor Phone side-by-side! (Double-column)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     OutlinedTextField(
                         value = dMail,
                         onValueChange = { dMail = it },
-                        label = { Text("Doc Email") },
+                        label = { Text("Doctor Email") },
                         modifier = Modifier.weight(1.1f),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
                         shape = RoundedCornerShape(10.dp),
@@ -4333,7 +4950,7 @@ fun ProfileEditDialog(
                     OutlinedTextField(
                         value = dPhone,
                         onValueChange = { dPhone = it },
-                        label = { Text("Doc Phone") },
+                        label = { Text("Doctor Phone") },
                         modifier = Modifier.weight(0.9f),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                         shape = RoundedCornerShape(10.dp),
@@ -4341,15 +4958,16 @@ fun ProfileEditDialog(
                     )
                 }
 
+                // Low and High limits + Unit selector side-by-side! (Triple-column)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     OutlinedTextField(
                         value = tMin,
                         onValueChange = { tMin = it },
-                        label = { Text("Low Target") },
+                        label = { Text("Low Limit") },
                         modifier = Modifier.weight(1f),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         shape = RoundedCornerShape(10.dp),
@@ -4358,19 +4976,21 @@ fun ProfileEditDialog(
                     OutlinedTextField(
                         value = tMax,
                         onValueChange = { tMax = it },
-                        label = { Text("High Target") },
+                        label = { Text("High Limit") },
                         modifier = Modifier.weight(1f),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         shape = RoundedCornerShape(10.dp),
                         singleLine = true
                     )
 
-                    Column(modifier = Modifier.weight(1.1f)) {
+                    // Segmented Control for Units (mg/dL vs mmol/L)
+                    Column(modifier = Modifier.weight(1.2f)) {
                         Text(
                             "Unit",
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.outline
+                            color = MaterialTheme.colorScheme.outline,
+                            modifier = Modifier.padding(bottom = 2.dp)
                         )
                         Row(
                             modifier = Modifier
@@ -4395,7 +5015,7 @@ fun ProfileEditDialog(
                                 ) {
                                     Text(
                                         text = unit,
-                                        fontSize = 10.sp,
+                                        fontSize = 9.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
                                     )
@@ -4409,14 +5029,60 @@ fun ProfileEditDialog(
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    TextButton(onClick = onDismiss) {
+                    TextButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.height(46.dp)
+                    ) {
                         Text("Cancel")
                     }
-                    Spacer(modifier = Modifier.width(10.dp))
+
+                    Spacer(modifier = Modifier.weight(0.1f))
+
+                    if (onSaveAsNew != null) {
+                        OutlinedButton(
+                            modifier = Modifier
+                                .weight(2f)
+                                .height(46.dp)
+                                .testTag("profile_save_as_new_button"),
+                            shape = RoundedCornerShape(12.dp),
+                            onClick = {
+                                val pMin = tMin.toDoubleOrNull() ?: 70.0
+                                val pMax = tMax.toDoubleOrNull() ?: 140.0
+                                onSaveAsNew(
+                                    UserProfile(
+                                        id = 0,
+                                        userName = uName.ifEmpty { "Patient" },
+                                        doctorName = dName,
+                                        doctorEmail = dMail,
+                                        doctorPhone = dPhone,
+                                        targetGlucoseMin = pMin,
+                                        targetGlucoseMax = pMax,
+                                        glucoseUnit = gUnit,
+                                        isActive = true
+                                    )
+                                )
+                            },
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary)
+                        ) {
+                            Icon(
+                                Icons.Default.Add,
+                                contentDescription = "New Profile Logo",
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Save as New", fontSize = 11.sp, maxLines = 1)
+                        }
+                    }
+
                     Button(
+                        modifier = Modifier
+                            .weight(2f)
+                            .height(46.dp)
+                            .testTag("profile_save_button"),
+                        shape = RoundedCornerShape(12.dp),
                         onClick = {
                             val pMin = tMin.toDoubleOrNull() ?: 70.0
                             val pMax = tMax.toDoubleOrNull() ?: 140.0
@@ -4433,7 +5099,13 @@ fun ProfileEditDialog(
                             )
                         }
                     ) {
-                        Text("Save Profile")
+                        Icon(
+                            Icons.Default.Save,
+                            contentDescription = "Save Profile Logo",
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(if (onSaveAsNew != null) "Save Active" else "Save Profile", fontSize = 11.sp, maxLines = 1)
                     }
                 }
             }
@@ -4603,6 +5275,703 @@ fun RefillFormDialog(
                 }
             }
         }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SettingsScreen(
+    viewModel: GlucoViewModel,
+    onBackClick: () -> Unit
+) {
+    val currentProfile by viewModel.userProfile.collectAsStateWithLifecycle()
+    val loggedInUser by viewModel.loggedInUser.collectAsStateWithLifecycle()
+    val isAdmin by viewModel.isAdmin.collectAsStateWithLifecycle()
+
+    val context = LocalContext.current
+    val prefs = remember { context.getSharedPreferences("gluco_auth_prefs", android.content.Context.MODE_PRIVATE) }
+    val linkedEmail = remember(loggedInUser) { prefs.getString("user_email_$loggedInUser", "") ?: "" }
+
+    var uName by remember(currentProfile) { mutableStateOf(currentProfile.userName) }
+    var dName by remember(currentProfile) { mutableStateOf(currentProfile.doctorName) }
+    var dMail by remember(currentProfile) { mutableStateOf(currentProfile.doctorEmail) }
+    var dPhone by remember(currentProfile) { mutableStateOf(currentProfile.doctorPhone) }
+    var tMin by remember(currentProfile) { mutableStateOf(currentProfile.targetGlucoseMin.toString()) }
+    var tMax by remember(currentProfile) { mutableStateOf(currentProfile.targetGlucoseMax.toString()) }
+    var gUnit by remember(currentProfile) { mutableStateOf(currentProfile.glucoseUnit) }
+
+    // Profile Picture / Avatar persistent state
+    var selectedAvatarIndex by remember(currentProfile.id) {
+        mutableStateOf(prefs.getInt("profile_avatar_${currentProfile.id}", 0))
+    }
+
+    // Archive, backup, and restore states
+    var showExportDialog by remember { mutableStateOf(false) }
+    var exportJsonText by remember { mutableStateOf("") }
+    var showImportDialog by remember { mutableStateOf(false) }
+    var importJsonText by remember { mutableStateOf("") }
+    var importErrorMsg by remember { mutableStateOf<String?>(null) }
+    var showClearConfirmDialog by remember { mutableStateOf(false) }
+    val clipboardManager = androidx.compose.ui.platform.LocalClipboardManager.current
+
+    // A list of 6 distinct beautiful styled avatars with modern color gradients and vector icons
+    val avatarOptions = listOf(
+        Icons.Default.MedicalServices to Color(0xFF1E88E5), // Blue
+        Icons.Default.Person to Color(0xFF8E24AA),          // Purple
+        Icons.Default.Favorite to Color(0xFFE53935),        // Red
+        Icons.Default.CloudQueue to Color(0xFF00ACC1),      // Teal cyan
+        Icons.Default.HealthAndSafety to Color(0xFF43A047), // Green
+        Icons.Default.LocalHospital to Color(0xFFFB8C00)    // Orange
+    )
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Settings", fontWeight = FontWeight.Bold) },
+                navigationIcon = {
+                    IconButton(onClick = onBackClick) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back back")
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                )
+            )
+        }
+    ) { innerPadding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            // Profile Picture Circle & Selector Card
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f))
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        text = "Choose Profile Picture",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+
+                    // Large circular display with currently active avatar!
+                    Box(
+                        modifier = Modifier
+                            .size(100.dp)
+                            .background(
+                                color = avatarOptions.getOrNull(selectedAvatarIndex)?.second ?: Color.Gray,
+                                shape = androidx.compose.foundation.shape.CircleShape
+                            )
+                            .padding(16.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = avatarOptions.getOrNull(selectedAvatarIndex)?.first ?: Icons.Default.Person,
+                            contentDescription = "Active Avatar Icon",
+                            tint = Color.White,
+                            modifier = Modifier.size(56.dp)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    // Row of selectable options
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceEvenly,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        avatarOptions.forEachIndexed { index, (icon, color) ->
+                            val isSelected = index == selectedAvatarIndex
+                            Box(
+                                modifier = Modifier
+                                    .size(46.dp)
+                                    .background(color, androidx.compose.foundation.shape.CircleShape)
+                                    .border(
+                                        width = if (isSelected) 3.dp else 0.dp,
+                                        color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
+                                        shape = androidx.compose.foundation.shape.CircleShape
+                                    )
+                                    .clickable {
+                                        selectedAvatarIndex = index
+                                        prefs.edit().putInt("profile_avatar_${currentProfile.id}", index).apply()
+                                    }
+                                    .padding(8.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = icon,
+                                    contentDescription = "Avatar Choice $index",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Connection/Auth status Card
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.2f))
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(
+                            text = "Logged in as:",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.outline
+                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Text(
+                                text = loggedInUser.ifEmpty { "Guest Patient" },
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                            if (isAdmin) {
+                                Card(
+                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primary),
+                                    shape = RoundedCornerShape(6.dp)
+                                ) {
+                                    Text(
+                                        text = "ADMIN",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onPrimary,
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
+                        if (linkedEmail.isNotEmpty()) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Email,
+                                    contentDescription = "Verified Email",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(12.dp)
+                                )
+                                Text(
+                                    text = linkedEmail,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                        }
+                    }
+
+                    OutlinedButton(
+                        onClick = {
+                            viewModel.logout()
+                            onBackClick()
+                        },
+                        modifier = Modifier.testTag("logout_button_settings_screen"),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.5f)),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.ExitToApp,
+                            contentDescription = "Sign Out Icon",
+                            modifier = Modifier.size(16.dp),
+                            tint = MaterialTheme.colorScheme.error
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Log Out", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error)
+                    }
+                }
+            }
+
+            // Edit Credentials Form
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    Text(
+                        text = "Edit Active Credentials",
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+
+                    // Patient and Doctor names side-by-side! (Double-column)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = uName,
+                            onValueChange = { uName = it },
+                            label = { Text("Patient Name") },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(10.dp),
+                            singleLine = true
+                        )
+                        OutlinedTextField(
+                            value = dName,
+                            onValueChange = { dName = it },
+                            label = { Text("Doctor Name") },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(10.dp),
+                            singleLine = true
+                        )
+                    }
+
+                    // Doctor email and Doctor Phone side-by-side! (Double-column)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = dMail,
+                            onValueChange = { dMail = it },
+                            label = { Text("Doctor Email") },
+                            modifier = Modifier.weight(1.1f),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                            shape = RoundedCornerShape(10.dp),
+                            singleLine = true
+                        )
+                        OutlinedTextField(
+                            value = dPhone,
+                            onValueChange = { dPhone = it },
+                            label = { Text("Doctor Phone") },
+                            modifier = Modifier.weight(0.9f),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                            shape = RoundedCornerShape(10.dp),
+                            singleLine = true
+                        )
+                    }
+
+                    // Low and High limits + Unit selector side-by-side! (Triple-column)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedTextField(
+                            value = tMin,
+                            onValueChange = { tMin = it },
+                            label = { Text("Low Limit") },
+                            modifier = Modifier.weight(1f),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            shape = RoundedCornerShape(10.dp),
+                            singleLine = true
+                        )
+                        OutlinedTextField(
+                            value = tMax,
+                            onValueChange = { tMax = it },
+                            label = { Text("High Limit") },
+                            modifier = Modifier.weight(1f),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            shape = RoundedCornerShape(10.dp),
+                            singleLine = true
+                        )
+
+                        // Segmented Control for Units (mg/dL vs mmol/L)
+                        Column(modifier = Modifier.weight(1.2f)) {
+                            Text(
+                                "Unit",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.outline,
+                                modifier = Modifier.padding(bottom = 2.dp)
+                            )
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(38.dp)
+                                    .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp))
+                                    .padding(2.dp)
+                            ) {
+                                val units = listOf("mg/dL", "mmol/L")
+                                units.forEach { unit ->
+                                    val isSelected = gUnit == unit
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .fillMaxHeight()
+                                            .background(
+                                                if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
+                                                RoundedCornerShape(6.dp)
+                                            )
+                                            .clickable { gUnit = unit },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = unit,
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    // Buttons Group (Save Changes & Save as New Profile)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Outlined Save as New
+                        OutlinedButton(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(46.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            onClick = {
+                                val pMin = tMin.toDoubleOrNull() ?: 70.0
+                                val pMax = tMax.toDoubleOrNull() ?: 140.0
+                                viewModel.saveNewProfileFlow(
+                                    com.example.data.model.UserProfile(
+                                        id = 0,
+                                        userName = uName.ifEmpty { "Patient" },
+                                        doctorName = dName,
+                                        doctorEmail = dMail,
+                                        doctorPhone = dPhone,
+                                        targetGlucoseMin = pMin,
+                                        targetGlucoseMax = pMax,
+                                        glucoseUnit = gUnit,
+                                        isActive = true
+                                    )
+                                )
+                                onBackClick()
+                            },
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary)
+                        ) {
+                            Icon(
+                                Icons.Default.Add,
+                                contentDescription = "New Profile Logo",
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Save as New", fontSize = 12.sp, maxLines = 1)
+                        }
+
+                        // Filled Save Changes
+                        Button(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(46.dp)
+                                .testTag("profile_save_button_settings_screen"),
+                            shape = RoundedCornerShape(12.dp),
+                            onClick = {
+                                val pMin = tMin.toDoubleOrNull() ?: 70.0
+                                val pMax = tMax.toDoubleOrNull() ?: 140.0
+                                viewModel.saveProfile(
+                                    com.example.data.model.UserProfile(
+                                        id = currentProfile.id,
+                                        userName = uName.ifEmpty { "Patient" },
+                                        doctorName = dName,
+                                        doctorEmail = dMail,
+                                        doctorPhone = dPhone,
+                                        targetGlucoseMin = pMin,
+                                        targetGlucoseMax = pMax,
+                                        glucoseUnit = gUnit,
+                                        isActive = true,
+                                        cartridgeCapacity = currentProfile.cartridgeCapacity,
+                                        cartridgeRemaining = currentProfile.cartridgeRemaining
+                                    )
+                                )
+                                onBackClick()
+                            }
+                        ) {
+                            Icon(
+                                Icons.Default.Save,
+                                contentDescription = "Save Profile Logo",
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Save Active", fontSize = 12.sp, maxLines = 1)
+                        }
+                    }
+                }
+            }
+
+            // App Data Management (Backup, Restore & Reset)
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    Text(
+                        text = "App Data Backup & Reset",
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = "Securely backup your healthcare logs, restore from previous active archives, or wipe your local records to start fresh.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        // Export Button
+                        OutlinedButton(
+                            modifier = Modifier.weight(1f).height(46.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            onClick = {
+                                viewModel.exportAppDataToJSON { json ->
+                                    exportJsonText = json ?: "[]"
+                                    showExportDialog = true
+                                }
+                            }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Share,
+                                contentDescription = "Export App Data",
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Export Data", fontSize = 12.sp)
+                        }
+
+                        // Import Button
+                        OutlinedButton(
+                            modifier = Modifier.weight(1f).height(46.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            onClick = {
+                                importJsonText = ""
+                                importErrorMsg = null
+                                showImportDialog = true
+                            }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.ArrowUpward,
+                                contentDescription = "Import App Data",
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Import Data", fontSize = 12.sp)
+                        }
+                    }
+
+                    // Reset Data Button
+                    Button(
+                        modifier = Modifier.fillMaxWidth().height(46.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer,
+                            contentColor = MaterialTheme.colorScheme.onErrorContainer
+                        ),
+                        onClick = { showClearConfirmDialog = true }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = "Clear All App Data",
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Clear All App Data", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+    }
+
+    // Backup & Restore Modals
+    if (showExportDialog) {
+        AlertDialog(
+            onDismissRequest = { showExportDialog = false },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Icon(Icons.Default.Share, contentDescription = "Export Icons", tint = MaterialTheme.colorScheme.primary)
+                    Text("Export App Backup", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                }
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        text = "Copy the backup code below and save it somewhere secure. You can use this code to fully restore your logs and profiles on any device.",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    OutlinedTextField(
+                        value = exportJsonText,
+                        onValueChange = {},
+                        readOnly = true,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(180.dp),
+                        textStyle = androidx.compose.ui.text.TextStyle(
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                            fontSize = 11.sp
+                        ),
+                        shape = RoundedCornerShape(10.dp)
+                    )
+                    Button(
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = {
+                            clipboardManager.setText(androidx.compose.ui.text.buildAnnotatedString { append(exportJsonText) })
+                            android.widget.Toast.makeText(context, "Backup code copied to clipboard!", android.widget.Toast.LENGTH_SHORT).show()
+                        },
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Text("Copy to Clipboard")
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showExportDialog = false }) {
+                    Text("Done")
+                }
+            }
+        )
+    }
+
+    if (showImportDialog) {
+        AlertDialog(
+            onDismissRequest = { showImportDialog = false },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Icon(Icons.Default.ArrowUpward, contentDescription = "Import Icons", tint = MaterialTheme.colorScheme.primary)
+                    Text("Import Archive Backup", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                }
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        text = "Paste your previously exported backup JSON block here. Warning: Importing an archive will overwrite your active data!",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    OutlinedTextField(
+                        value = importJsonText,
+                        onValueChange = { 
+                            importJsonText = it
+                            importErrorMsg = null 
+                        },
+                        placeholder = { Text("Paste JSON backup string here...") },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(160.dp),
+                        textStyle = androidx.compose.ui.text.TextStyle(
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                            fontSize = 11.sp
+                        ),
+                        shape = RoundedCornerShape(10.dp)
+                    )
+                    if (importErrorMsg != null) {
+                        Text(
+                            text = importErrorMsg ?: "",
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (importJsonText.trim().isEmpty()) {
+                            importErrorMsg = "Please paste a valid JSON backup string"
+                        } else {
+                            viewModel.importAppDataFromJSON(importJsonText) { success ->
+                                if (success) {
+                                    android.widget.Toast.makeText(context, "Archive restored successfully!", android.widget.Toast.LENGTH_LONG).show()
+                                    showImportDialog = false
+                                } else {
+                                    importErrorMsg = "Failed to parse backup JSON. Please ensure the code is complete and valid."
+                                }
+                            }
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Text("Verify & Restore")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showImportDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    if (showClearConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = { showClearConfirmDialog = false },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Icon(Icons.Default.Delete, contentDescription = "Wipe Icons", tint = MaterialTheme.colorScheme.error)
+                    Text("Confirm Hard Reset", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error)
+                }
+            },
+            text = {
+                Text(
+                    text = "Are you absolutely sure you want to permanently delete all health logs, medication records, profiles, and reminders from this device? This action cannot be undone.",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.clearAllAppData {
+                            android.widget.Toast.makeText(context, "All app data cleared successfully!", android.widget.Toast.LENGTH_LONG).show()
+                            showClearConfirmDialog = false
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Text("Permanently Wipe Data")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClearConfirmDialog = false }) {
+                    Text("Keep My Data")
+                }
+            }
+        )
     }
 }
 

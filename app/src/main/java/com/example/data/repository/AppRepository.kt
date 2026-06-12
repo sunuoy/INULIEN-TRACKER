@@ -141,4 +141,12 @@ class AppRepository(
     suspend fun clearAllBloodPressureRecords() {
         bloodPressureDao.clearAllBloodPressureRecords()
     }
+
+    suspend fun clearAllReminders() {
+        reminderDao.clearAllReminders()
+    }
+
+    suspend fun clearAllProfiles() {
+        profileDao.clearAllProfiles()
+    }
 }
