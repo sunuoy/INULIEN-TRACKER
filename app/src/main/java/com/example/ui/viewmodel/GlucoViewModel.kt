@@ -23,6 +23,8 @@ import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import org.json.JSONArray
 import java.text.SimpleDateFormat
@@ -40,6 +42,19 @@ enum class AppScreen {
 class GlucoViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repository: AppRepository
+
+    // Google Drive Sync states
+    private val _googleDriveSyncEnabled = MutableStateFlow(false)
+    val googleDriveSyncEnabled: StateFlow<Boolean> = _googleDriveSyncEnabled.asStateFlow()
+
+    private val _googleDriveAccessToken = MutableStateFlow("")
+    val googleDriveAccessToken: StateFlow<String> = _googleDriveAccessToken.asStateFlow()
+
+    private val _isGoogleDriveSyncing = MutableStateFlow(false)
+    val isGoogleDriveSyncing: StateFlow<Boolean> = _isGoogleDriveSyncing.asStateFlow()
+
+    private val _googleDriveLastSyncTime = MutableStateFlow("Never")
+    val googleDriveLastSyncTime: StateFlow<String> = _googleDriveLastSyncTime.asStateFlow()
 
     // Selected Theme State
     private val _selectedTheme = MutableStateFlow("midnight_carbon")
@@ -647,6 +662,11 @@ class GlucoViewModel(application: Application) : AndroidViewModel(application) {
         _backendBaseUrl.value = prefs.getString("gluco_backend_base_url", "https://httpbin.org/") ?: "https://httpbin.org/"
         _lastSyncTime.value = prefs.getString("gluco_last_sync_time", "Never") ?: "Never"
         _selectedTheme.value = prefs.getString("selected_theme", "midnight_carbon") ?: "midnight_carbon"
+
+        // Load Google Drive preferences
+        _googleDriveSyncEnabled.value = prefs.getBoolean("gd_sync_enabled", false)
+        _googleDriveAccessToken.value = prefs.getString("gd_access_token", "") ?: ""
+        _googleDriveLastSyncTime.value = prefs.getString("gd_last_sync_time", "Never") ?: "Never"
 
         // Load remember me preferences
         val isRememberChecked = prefs.getBoolean("remember_me_checked", false)
@@ -2168,6 +2188,123 @@ class GlucoViewModel(application: Application) : AndroidViewModel(application) {
                 onComplete(true)
             } catch (e: java.lang.Exception) {
                 onComplete(false)
+            }
+        }
+    }
+
+    fun setGoogleDriveAccessToken(token: String) {
+        val trimmed = token.trim()
+        _googleDriveAccessToken.value = trimmed
+        val prefs = getApplication<Application>().getSharedPreferences("gluco_auth_prefs", Context.MODE_PRIVATE)
+        prefs.edit().putString("gd_access_token", trimmed).apply()
+        if (trimmed.isNotEmpty()) {
+            _googleDriveSyncEnabled.value = true
+            prefs.edit().putBoolean("gd_sync_enabled", true).apply()
+        }
+    }
+
+    fun disableGoogleDriveSync() {
+        _googleDriveSyncEnabled.value = false
+        _googleDriveAccessToken.value = ""
+        val prefs = getApplication<Application>().getSharedPreferences("gluco_auth_prefs", Context.MODE_PRIVATE)
+        prefs.edit()
+            .putBoolean("gd_sync_enabled", false)
+            .remove("gd_access_token")
+            .apply()
+    }
+
+    fun backupToGoogleDrive(onComplete: (Boolean, String) -> Unit) {
+        val token = _googleDriveAccessToken.value
+        if (token.isEmpty()) {
+            onComplete(false, "Google Drive not authorized. Please configure access token.")
+            return
+        }
+
+        viewModelScope.launch {
+            _isGoogleDriveSyncing.value = true
+            try {
+                exportAppDataToJSON { json ->
+                    if (json == null) {
+                        _isGoogleDriveSyncing.value = false
+                        onComplete(false, "Failed to compile local clinical records to JSON.")
+                        return@exportAppDataToJSON
+                    }
+
+                    viewModelScope.launch(Dispatchers.IO) {
+                        try {
+                            val existingFileId = com.example.data.api.GoogleDriveService.findBackupFile(token)
+                            val success = com.example.data.api.GoogleDriveService.uploadBackupFile(token, json, existingFileId)
+                            
+                            withContext(Dispatchers.Main) {
+                                _isGoogleDriveSyncing.value = false
+                                if (success) {
+                                    val nowStr = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date())
+                                    _googleDriveLastSyncTime.value = nowStr
+                                    getApplication<Application>().getSharedPreferences("gluco_auth_prefs", Context.MODE_PRIVATE)
+                                        .edit().putString("gd_last_sync_time", nowStr).apply()
+                                    onComplete(true, "Successfully backed up clinical data to Google Drive!")
+                                } else {
+                                    onComplete(false, "Drive upload failed. Please check access token scope or expiry.")
+                                }
+                            }
+                        } catch (e: Exception) {
+                            withContext(Dispatchers.Main) {
+                                _isGoogleDriveSyncing.value = false
+                                onComplete(false, "Connection error: ${e.message}")
+                            }
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                _isGoogleDriveSyncing.value = false
+                onComplete(false, "Preparation error: ${e.message}")
+            }
+        }
+    }
+
+    fun restoreFromGoogleDrive(onComplete: (Boolean, String) -> Unit) {
+        val token = _googleDriveAccessToken.value
+        if (token.isEmpty()) {
+            onComplete(false, "Google Drive not authorized. Please configure access token.")
+            return
+        }
+
+        viewModelScope.launch(Dispatchers.IO) {
+            withContext(Dispatchers.Main) {
+                _isGoogleDriveSyncing.value = true
+            }
+
+            try {
+                val existingFileId = com.example.data.api.GoogleDriveService.findBackupFile(token)
+                if (existingFileId == null) {
+                    withContext(Dispatchers.Main) {
+                        _isGoogleDriveSyncing.value = false
+                        onComplete(false, "No 'glucolog_backup.json' file is found on your Google Drive.")
+                    }
+                    return@launch
+                }
+
+                val jsonContent = com.example.data.api.GoogleDriveService.downloadBackupFile(token, existingFileId)
+                withContext(Dispatchers.Main) {
+                    if (jsonContent != null) {
+                        importAppDataFromJSON(jsonContent) { success ->
+                            _isGoogleDriveSyncing.value = false
+                            if (success) {
+                                onComplete(true, "Successfully restored clinical records from Google Drive!")
+                            } else {
+                                onComplete(false, "Downloaded backup file has an invalid structure.")
+                            }
+                        }
+                    } else {
+                        _isGoogleDriveSyncing.value = false
+                        onComplete(false, "Failed to download backup file from Google Drive.")
+                    }
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    _isGoogleDriveSyncing.value = false
+                    onComplete(false, "Connection error: ${e.message}")
+                }
             }
         }
     }

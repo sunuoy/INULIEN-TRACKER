@@ -45,6 +45,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.util.Calendar
 import com.example.data.model.GlucoseReading
 import com.example.data.model.InsulinRecord
@@ -77,114 +78,507 @@ fun GlucoAppLayout(viewModel: GlucoViewModel) {
     var editingRefillLog by remember { mutableStateOf<CartridgeRefillLog?>(null) }
     var showBloodPressureDialog by remember { mutableStateOf(false) }
 
-    Scaffold(
-        bottomBar = {
-            NavigationBar(
+    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+    val scope = rememberCoroutineScope()
+    var showGdRestoreConfirmDialog by remember { mutableStateOf(false) }
+
+    val gdSyncEnabled by viewModel.googleDriveSyncEnabled.collectAsStateWithLifecycle()
+    val gdAccessToken by viewModel.googleDriveAccessToken.collectAsStateWithLifecycle()
+    val isGdSyncing by viewModel.isGoogleDriveSyncing.collectAsStateWithLifecycle()
+    val gdLastSyncTime by viewModel.googleDriveLastSyncTime.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+
+    ModalNavigationDrawer(
+        drawerState = drawerState,
+        drawerContent = {
+            ModalDrawerSheet(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("app_navigation_bar"),
-                tonalElevation = 6.dp
+                    .width(320.dp)
+                    .fillMaxHeight(),
+                drawerContainerColor = MaterialTheme.colorScheme.surface,
+                drawerTonalElevation = 8.dp
             ) {
-                listOf(
-                    NavigationItem("Home", Icons.Default.Home, Icons.Outlined.Home, AppScreen.HOME),
-                    NavigationItem("Logs", Icons.Default.List, Icons.Outlined.List, AppScreen.HISTORY),
-                    NavigationItem("Reminders", Icons.Default.Notifications, Icons.Outlined.Notifications, AppScreen.REMINDERS),
-                    NavigationItem("Reports", Icons.Default.Assessment, Icons.Outlined.Assessment, AppScreen.REPORTS),
-                    NavigationItem("Profile", Icons.Default.Person, Icons.Outlined.Person, AppScreen.PROFILE)
-                ).forEach { item ->
-                    val isSelected = currentScreen == item.screen
-                    NavigationBarItem(
-                        selected = isSelected,
-                        onClick = { viewModel.navigateTo(item.screen) },
-                        label = { Text(item.title, fontSize = 11.sp, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal) },
-                        icon = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    // Drawer Header
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
                             Icon(
-                                imageVector = if (isSelected) item.selectedIcon else item.unselectedIcon,
-                                contentDescription = item.title
+                                imageVector = Icons.Default.Menu,
+                                contentDescription = "Sync Menu",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(28.dp)
+                            )
+                            Text(
+                                text = "Menu",
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
                             )
                         }
-                    )
+                        IconButton(
+                            onClick = {
+                                scope.launch { drawerState.close() }
+                            }
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "Close Menu",
+                                tint = MaterialTheme.colorScheme.outline
+                            )
+                        }
+                    }
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
+                    // Quick Navigation / Controls Card
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.2f))
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Text(
+                                text = "General Database Actions",
+                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+
+                            // Sync All Button inside Drawer
+                            Button(
+                                modifier = Modifier.fillMaxWidth().height(40.dp),
+                                onClick = {
+                                    scope.launch { drawerState.close() }
+                                    viewModel.triggerUploadSync()
+                                    if (gdSyncEnabled) {
+                                        viewModel.backupToGoogleDrive { _, _ -> }
+                                    }
+                                    android.widget.Toast.makeText(context, "Full medical database sync initiated!", android.widget.Toast.LENGTH_SHORT).show()
+                                },
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Icon(Icons.Default.Sync, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Sync All Data", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            }
+
+                            // Go to Settings Screen
+                            OutlinedButton(
+                                modifier = Modifier.fillMaxWidth().height(40.dp),
+                                onClick = {
+                                    scope.launch { drawerState.close() }
+                                    viewModel.navigateTo(AppScreen.SETTINGS)
+                                },
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Icon(Icons.Default.Settings, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("App Settings & Profile", fontSize = 12.sp)
+                            }
+                        }
+                    }
+
+                    // Google Drive Cloud Backup section inside the Drawer!
+                    Card(
+                        modifier = Modifier.fillMaxWidth().testTag("google_drive_sync_card"),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(14.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "Google Drive Sync",
+                                    fontWeight = FontWeight.Bold,
+                                    style = MaterialTheme.typography.titleSmall,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+
+                                // Syncing loading state
+                                if (isGdSyncing) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(18.dp),
+                                        strokeWidth = 2.dp,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                } else {
+                                    Surface(
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = if (gdSyncEnabled) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                        ) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(6.dp)
+                                                    .background(
+                                                        color = if (gdSyncEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+                                                        shape = CircleShape
+                                                    )
+                                            )
+                                            Text(
+                                                text = if (gdSyncEnabled) "Active" else "Inactive",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                fontWeight = FontWeight.Bold,
+                                                color = if (gdSyncEnabled) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
+                            Text(
+                                text = "Synchronize clinical records to your private Google Drive securely inside 'glucolog_backup.json'.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+
+                            if (gdSyncEnabled) {
+                                // Information row
+                                Column(
+                                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                                    modifier = Modifier
+                                        .background(
+                                            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f),
+                                            shape = RoundedCornerShape(8.dp)
+                                        )
+                                        .padding(8.dp)
+                                        .fillMaxWidth()
+                                ) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Text("Last sync:", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
+                                        Text(gdLastSyncTime, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                                    }
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Text("File Name:", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
+                                        Text("glucolog_backup.json", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                                    }
+                                }
+
+                                Column(
+                                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    // Backup Button
+                                    Button(
+                                        modifier = Modifier.fillMaxWidth().height(38.dp).testTag("gd_cloud_backup_btn"),
+                                        onClick = {
+                                            viewModel.backupToGoogleDrive { success, msg ->
+                                                android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_LONG).show()
+                                            }
+                                        },
+                                        shape = RoundedCornerShape(8.dp)
+                                    ) {
+                                        Icon(Icons.Default.CloudUpload, contentDescription = "Backup", modifier = Modifier.size(14.dp))
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text("Back Up Now", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    }
+
+                                    // Restore Button
+                                    OutlinedButton(
+                                        modifier = Modifier.fillMaxWidth().height(38.dp).testTag("gd_cloud_restore_btn"),
+                                        onClick = {
+                                            showGdRestoreConfirmDialog = true
+                                        },
+                                        shape = RoundedCornerShape(8.dp)
+                                    ) {
+                                        Icon(Icons.Default.CloudDownload, contentDescription = "Restore", modifier = Modifier.size(14.dp))
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text("Restore Backup", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+
+                                TextButton(
+                                    onClick = {
+                                        viewModel.disableGoogleDriveSync()
+                                        android.widget.Toast.makeText(context, "Google Drive sync disabled successfully.", android.widget.Toast.LENGTH_SHORT).show()
+                                    },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                                ) {
+                                    Text("Disable Cloud Sync", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                }
+                            } else {
+                                // Token configuration
+                                Column(
+                                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    var tempToken by remember { mutableStateOf("") }
+
+                                    OutlinedTextField(
+                                        value = tempToken,
+                                        onValueChange = { tempToken = it },
+                                        label = { Text("Google OAuth Token (Access Token)", fontSize = 11.sp) },
+                                        placeholder = { Text("ya29.a0Axoo...") },
+                                        singleLine = true,
+                                        modifier = Modifier.fillMaxWidth().testTag("gd_oauth_token_input"),
+                                        shape = RoundedCornerShape(8.dp),
+                                        textStyle = MaterialTheme.typography.bodySmall
+                                    )
+
+                                    Button(
+                                        onClick = {
+                                            if (tempToken.trim().isEmpty()) {
+                                                android.widget.Toast.makeText(context, "Please enter a valid Google Drive Access Token.", android.widget.Toast.LENGTH_SHORT).show()
+                                            } else {
+                                                viewModel.setGoogleDriveAccessToken(tempToken)
+                                                android.widget.Toast.makeText(context, "Google Drive Connected!", android.widget.Toast.LENGTH_SHORT).show()
+                                                viewModel.backupToGoogleDrive { success, msg ->
+                                                    android.widget.Toast.makeText(context, "Auto-Backup: $msg", android.widget.Toast.LENGTH_LONG).show()
+                                                }
+                                            }
+                                        },
+                                        modifier = Modifier.fillMaxWidth().height(40.dp).testTag("gd_enable_btn"),
+                                        shape = RoundedCornerShape(8.dp)
+                                    ) {
+                                        Icon(Icons.Default.CloudQueue, contentDescription = "Authorize", modifier = Modifier.size(14.dp))
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text("Enable Google Drive Sync", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.weight(1f))
+
+                    // Exit App Button
+                    Button(
+                        onClick = {
+                            viewModel.logout()
+                            android.widget.Toast.makeText(context, "Logged out successfully.", android.widget.Toast.LENGTH_SHORT).show()
+                            scope.launch { drawerState.close() }
+                        },
+                        modifier = Modifier.fillMaxWidth().height(42.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.errorContainer, contentColor = MaterialTheme.colorScheme.onErrorContainer),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Icon(imageVector = Icons.Default.ExitToApp, contentDescription = "Exit App", modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Exit App / Logout", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
                 }
             }
         }
-    ) { innerPadding ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-        ) {
-            when (currentScreen) {
-                AppScreen.HOME -> HomeScreen(
-                    viewModel = viewModel,
-                    onLogInsulinClick = {
-                        viewModel.resetInsulinForm()
-                        showInsulinDialog = true
+    ) {
+        val currentScreen by viewModel.currentScreen.collectAsStateWithLifecycle()
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = {
+                        val titleText = when (currentScreen) {
+                            AppScreen.HOME -> "Clinical Dashboard"
+                            AppScreen.HISTORY -> "Clinical Logs History"
+                            AppScreen.REMINDERS -> "Medication Reminders"
+                            AppScreen.REPORTS -> "Interactive Reports"
+                            AppScreen.PROFILE -> "User Settings & Profile"
+                            else -> "System Settings"
+                        }
+                        Text(
+                            text = titleText,
+                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.titleMedium
+                        )
                     },
-                    onLogGlucoseClick = {
-                        viewModel.resetGlucoseForm()
-                        showGlucoseDialog = true
+                    navigationIcon = {
+                        IconButton(
+                            onClick = {
+                                scope.launch {
+                                    if (drawerState.isClosed) drawerState.open() else drawerState.close()
+                                }
+                            },
+                            modifier = Modifier
+                                .testTag("menu_nav_icon_button")
+                                .padding(horizontal = 4.dp)
+                                .size(width = 84.dp, height = 48.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Menu,
+                                    contentDescription = "Menu icon",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                                Text(
+                                    text = "Menu",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
                     },
-                    onRefillClick = {
-                        editingRefillLog = null
-                        showRefillFormDialog = true
+                    actions = {
+                        // Create an explicit Quick Sync button
+                        IconButton(
+                            onClick = {
+                                viewModel.triggerUploadSync()
+                                if (gdSyncEnabled) {
+                                    viewModel.backupToGoogleDrive { _, _ -> }
+                                }
+                                android.widget.Toast.makeText(context, "Syncing medical data...", android.widget.Toast.LENGTH_SHORT).show()
+                            },
+                            modifier = Modifier.testTag("action_sync_data")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Sync,
+                                contentDescription = "Sync medical data",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
                     },
-                    onLogBloodPressureClick = {
-                        viewModel.resetBloodPressureForm()
-                        showBloodPressureDialog = true
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        titleContentColor = MaterialTheme.colorScheme.onSurface,
+                        navigationIconContentColor = MaterialTheme.colorScheme.primary,
+                        actionIconContentColor = MaterialTheme.colorScheme.primary
+                    )
+                )
+            },
+            bottomBar = {
+                NavigationBar(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("app_navigation_bar"),
+                    tonalElevation = 6.dp
+                ) {
+                    listOf(
+                        NavigationItem("Home", Icons.Default.Home, Icons.Outlined.Home, AppScreen.HOME),
+                        NavigationItem("Logs", Icons.Default.List, Icons.Outlined.List, AppScreen.HISTORY),
+                        NavigationItem("Reminders", Icons.Default.Notifications, Icons.Outlined.Notifications, AppScreen.REMINDERS),
+                        NavigationItem("Reports", Icons.Default.Assessment, Icons.Outlined.Assessment, AppScreen.REPORTS),
+                        NavigationItem("Profile", Icons.Default.Person, Icons.Outlined.Person, AppScreen.PROFILE)
+                    ).forEach { item ->
+                        val isSelected = currentScreen == item.screen
+                        NavigationBarItem(
+                            selected = isSelected,
+                            onClick = { viewModel.navigateTo(item.screen) },
+                            label = { Text(item.title, fontSize = 11.sp, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal) },
+                            icon = {
+                                Icon(
+                                    imageVector = if (isSelected) item.selectedIcon else item.unselectedIcon,
+                                    contentDescription = item.title
+                                )
+                            }
+                        )
                     }
-                )
-                AppScreen.HISTORY -> HistoryScreen(
-                    viewModel = viewModel,
-                    onEditInsulin = { record ->
-                        viewModel.prepareEditInsulin(record)
-                        showInsulinDialog = true
-                    },
-                    onEditGlucose = { reading ->
-                        viewModel.prepareEditGlucose(reading)
-                        showGlucoseDialog = true
-                    },
-                    onEditRefill = { log ->
-                        editingRefillLog = log
-                        showRefillFormDialog = true
-                    },
-                    onEditBloodPressure = { record ->
-                        viewModel.prepareEditBloodPressure(record)
-                        showBloodPressureDialog = true
-                    },
-                    onAddInsulinClick = {
-                        viewModel.resetInsulinForm()
-                        showInsulinDialog = true
-                    },
-                    onAddGlucoseClick = {
-                        viewModel.resetGlucoseForm()
-                        showGlucoseDialog = true
-                    },
-                    onAddRefillClick = {
-                        editingRefillLog = null
-                        showRefillFormDialog = true
-                    },
-                    onAddBloodPressureClick = {
-                        viewModel.resetBloodPressureForm()
-                        showBloodPressureDialog = true
-                    }
-                )
-                AppScreen.REMINDERS -> RemindersScreen(
-                    viewModel = viewModel,
-                    onAddReminderClick = {
-                        viewModel.resetReminderForm()
-                        showReminderDialog = true
-                    },
-                    onEditReminder = { reminder ->
-                        viewModel.prepareEditReminder(reminder)
-                        showReminderDialog = true
-                    }
-                )
-                AppScreen.REPORTS -> ReportsScreen(viewModel = viewModel)
-                AppScreen.PROFILE -> ProfileScreen(viewModel = viewModel)
-                AppScreen.SETTINGS -> SettingsScreen(
-                    viewModel = viewModel,
-                    onBackClick = { viewModel.navigateTo(AppScreen.PROFILE) }
-                )
+                }
+            }
+        ) { innerPadding ->
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+            ) {
+                when (currentScreen) {
+                    AppScreen.HOME -> HomeScreen(
+                        viewModel = viewModel,
+                        onLogInsulinClick = {
+                            viewModel.resetInsulinForm()
+                            showInsulinDialog = true
+                        },
+                        onLogGlucoseClick = {
+                            viewModel.resetGlucoseForm()
+                            showGlucoseDialog = true
+                        },
+                        onRefillClick = {
+                            editingRefillLog = null
+                            showRefillFormDialog = true
+                        },
+                        onLogBloodPressureClick = {
+                            viewModel.resetBloodPressureForm()
+                            showBloodPressureDialog = true
+                        }
+                    )
+                    AppScreen.HISTORY -> HistoryScreen(
+                        viewModel = viewModel,
+                        onEditInsulin = { record ->
+                            viewModel.prepareEditInsulin(record)
+                            showInsulinDialog = true
+                        },
+                        onEditGlucose = { reading ->
+                            viewModel.prepareEditGlucose(reading)
+                            showGlucoseDialog = true
+                        },
+                        onEditRefill = { log ->
+                            editingRefillLog = log
+                            showRefillFormDialog = true
+                        },
+                        onEditBloodPressure = { record ->
+                            viewModel.prepareEditBloodPressure(record)
+                            showBloodPressureDialog = true
+                        },
+                        onAddInsulinClick = {
+                            viewModel.resetInsulinForm()
+                            showInsulinDialog = true
+                        },
+                        onAddGlucoseClick = {
+                            viewModel.resetGlucoseForm()
+                            showGlucoseDialog = true
+                        },
+                        onAddRefillClick = {
+                            editingRefillLog = null
+                            showRefillFormDialog = true
+                        },
+                        onAddBloodPressureClick = {
+                            viewModel.resetBloodPressureForm()
+                            showBloodPressureDialog = true
+                        }
+                    )
+                    AppScreen.REMINDERS -> RemindersScreen(
+                        viewModel = viewModel,
+                        onAddReminderClick = {
+                            viewModel.resetReminderForm()
+                            showReminderDialog = true
+                        },
+                        onEditReminder = { reminder ->
+                            viewModel.prepareEditReminder(reminder)
+                            showReminderDialog = true
+                        }
+                    )
+                    AppScreen.REPORTS -> ReportsScreen(viewModel = viewModel)
+                    AppScreen.PROFILE -> ProfileScreen(viewModel = viewModel)
+                    AppScreen.SETTINGS -> SettingsScreen(
+                        viewModel = viewModel,
+                        onBackClick = { viewModel.navigateTo(AppScreen.PROFILE) }
+                    )
+                }
             }
         }
     }
@@ -242,6 +636,42 @@ fun GlucoAppLayout(viewModel: GlucoViewModel) {
              }
          )
      }
+      if (showGdRestoreConfirmDialog) {
+          AlertDialog(
+              onDismissRequest = { showGdRestoreConfirmDialog = false },
+              title = {
+                  Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                      Icon(Icons.Default.CloudDownload, contentDescription = "Restore Cloud Icon", tint = MaterialTheme.colorScheme.primary)
+                      Text("Restore Cloud Backup", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                  }
+              },
+              text = {
+                  Text(
+                      text = "Are you sure you want to download and restore your healthcare files from Google Drive? This will completely overwrite all dynamic metrics, glucose readings, blood pressure levels, insulin doses, and reminders currently saved on this device.",
+                      style = MaterialTheme.typography.bodyMedium
+                  )
+              },
+              confirmButton = {
+                  Button(
+                      onClick = {
+                          showGdRestoreConfirmDialog = false
+                          viewModel.restoreFromGoogleDrive { success, msg ->
+                              android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_LONG).show()
+                          }
+                      },
+                      colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                      shape = RoundedCornerShape(10.dp)
+                  ) {
+                      Text("Overwrite & Restore")
+                  }
+              },
+              dismissButton = {
+                  TextButton(onClick = { showGdRestoreConfirmDialog = false }) {
+                      Text("Cancel")
+                  }
+              }
+          )
+      }
     }
 }
 
@@ -5178,6 +5608,12 @@ fun SettingsScreen(
     val currentProfile by viewModel.userProfile.collectAsStateWithLifecycle()
     val loggedInUser by viewModel.loggedInUser.collectAsStateWithLifecycle()
     val isAdmin by viewModel.isAdmin.collectAsStateWithLifecycle()
+
+    // Google Drive Sync collected states
+    val gdSyncEnabled by viewModel.googleDriveSyncEnabled.collectAsStateWithLifecycle()
+    val gdAccessToken by viewModel.googleDriveAccessToken.collectAsStateWithLifecycle()
+    val isGdSyncing by viewModel.isGoogleDriveSyncing.collectAsStateWithLifecycle()
+    val gdLastSyncTime by viewModel.googleDriveLastSyncTime.collectAsStateWithLifecycle()
 
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences("gluco_auth_prefs", android.content.Context.MODE_PRIVATE) }
