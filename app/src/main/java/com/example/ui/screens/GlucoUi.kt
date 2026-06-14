@@ -3945,83 +3945,20 @@ fun ProfileScreen(viewModel: GlucoViewModel) {
     ) {
         // Headline
         item {
-            var showMenu by remember { mutableStateOf(false) }
-            val context = LocalContext.current
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+            Column(
+                modifier = Modifier.fillMaxWidth()
             ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "Clinical Profile",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onBackground
-                    )
-                    Text(
-                        text = "Quick-switch and edit profiles compactly",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.outline
-                    )
-                }
-
-                Box {
-                    IconButton(
-                        onClick = { showMenu = !showMenu },
-                        modifier = Modifier.testTag("profile_dropdown_menu_button")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Menu,
-                            contentDescription = "Profile Menu Options",
-                            tint = MaterialTheme.colorScheme.onBackground
-                        )
-                    }
-
-                    DropdownMenu(
-                        expanded = showMenu,
-                        onDismissRequest = { showMenu = false }
-                    ) {
-                        DropdownMenuItem(
-                            text = { 
-                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    Icon(
-                                        imageVector = Icons.Default.Settings,
-                                        contentDescription = "Settings",
-                                        tint = MaterialTheme.colorScheme.onSurface,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                    Text("Settings") 
-                                }
-                            },
-                            onClick = {
-                                showMenu = false
-                                viewModel.navigateTo(AppScreen.SETTINGS)
-                            },
-                            modifier = Modifier.testTag("profile_dropdown_settings_item")
-                        )
-                        DropdownMenuItem(
-                            text = { 
-                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    Icon(
-                                        imageVector = Icons.Default.ExitToApp,
-                                        contentDescription = "Exit App",
-                                        tint = MaterialTheme.colorScheme.error,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                    Text("Exit App", color = MaterialTheme.colorScheme.error) 
-                                }
-                            },
-                            onClick = {
-                                showMenu = false
-                                val activity = context as? android.app.Activity
-                                activity?.finish()
-                            },
-                            modifier = Modifier.testTag("profile_dropdown_exit_item")
-                        )
-                    }
-                }
+                Text(
+                    text = "Clinical Profile",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+                Text(
+                    text = "Quick-switch and edit profiles compactly",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.outline
+                )
             }
         }
 
