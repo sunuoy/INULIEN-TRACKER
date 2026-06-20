@@ -47,6 +47,12 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.Calendar
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.text.drawText
 import com.example.data.model.GlucoseReading
 import com.example.data.model.InsulinRecord
 import com.example.data.model.Reminder
@@ -55,7 +61,6 @@ import com.example.data.model.CartridgeRefillLog
 import com.example.data.model.BloodPressureRecord
 import com.example.ui.viewmodel.AppScreen
 import com.example.ui.viewmodel.GlucoViewModel
-import java.text.SimpleDateFormat
 import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -154,7 +159,7 @@ fun GlucoAppLayout(viewModel: GlucoViewModel) {
                             verticalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
                             Text(
-                                text = "General Database Actions",
+                                text = "Navigation & Database Actions",
                                 fontWeight = FontWeight.Bold,
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.primary
@@ -178,6 +183,20 @@ fun GlucoAppLayout(viewModel: GlucoViewModel) {
                                 Text("Sync All Data", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                             }
 
+                            // Go to Clinical Profile Screen
+                            OutlinedButton(
+                                modifier = Modifier.fillMaxWidth().height(40.dp),
+                                onClick = {
+                                    scope.launch { drawerState.close() }
+                                    viewModel.navigateTo(AppScreen.PROFILE)
+                                },
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Icon(Icons.Default.Person, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Clinical Profile", fontSize = 12.sp)
+                            }
+
                             // Go to Settings Screen
                             OutlinedButton(
                                 modifier = Modifier.fillMaxWidth().height(40.dp),
@@ -189,7 +208,7 @@ fun GlucoAppLayout(viewModel: GlucoViewModel) {
                             ) {
                                 Icon(Icons.Default.Settings, contentDescription = null, modifier = Modifier.size(16.dp))
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text("App Settings & Profile", fontSize = 12.sp)
+                                Text("App Settings & Configuration", fontSize = 12.sp)
                             }
                         }
                     }
@@ -482,8 +501,7 @@ fun GlucoAppLayout(viewModel: GlucoViewModel) {
                         NavigationItem("Home", Icons.Default.Home, Icons.Outlined.Home, AppScreen.HOME),
                         NavigationItem("Logs", Icons.Default.List, Icons.Outlined.List, AppScreen.HISTORY),
                         NavigationItem("Reminders", Icons.Default.Notifications, Icons.Outlined.Notifications, AppScreen.REMINDERS),
-                        NavigationItem("Reports", Icons.Default.Assessment, Icons.Outlined.Assessment, AppScreen.REPORTS),
-                        NavigationItem("Profile", Icons.Default.Person, Icons.Outlined.Person, AppScreen.PROFILE)
+                        NavigationItem("Reports", Icons.Default.Assessment, Icons.Outlined.Assessment, AppScreen.REPORTS)
                     ).forEach { item ->
                         val isSelected = currentScreen == item.screen
                         NavigationBarItem(
@@ -1534,6 +1552,15 @@ private data class NavigationItem(
     val screen: AppScreen
 )
 
+private data class GlucoseGraphLayout(
+    val points: List<Pair<Float, Float>>, // xFraction, yFraction (0=bottom, 1=top)
+    val minFraction: Float,
+    val maxFraction: Float,
+    val originalTrend: List<com.example.data.model.GlucoseReading>,
+    val minVal: Double,
+    val maxVal: Double
+)
+
 // ==========================================
 // HOME SCREEN VIEW
 // ==========================================
@@ -1550,9 +1577,36 @@ fun HomeScreen(
     val rawGlucose by viewModel.glucoseReadings.collectAsStateWithLifecycle()
     val remindersList by viewModel.reminders.collectAsStateWithLifecycle()
 
-    val reportsData = viewModel.getReportsData(rawInsulin, rawGlucose, profile)
+    // --- Performance Optimizations & Dashboard Feeds (Smooth scrolling, cached results) ---
+    val reportsData = remember(rawInsulin, rawGlucose, profile) {
+        viewModel.getReportsData(rawInsulin, rawGlucose, profile)
+    }
+
+    val startOfToday = remember(rawGlucose, rawInsulin) {
+        Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
+    }
+
+    val todayGlucoseReadings = remember(rawGlucose, startOfToday) {
+        rawGlucose.filter { it.dateTimeMillis >= startOfToday }.sortedByDescending { it.dateTimeMillis }
+    }
+
+    val fallbackGlucoseReadings = remember(rawGlucose) {
+        rawGlucose.sortedByDescending { it.dateTimeMillis }.take(3)
+    }
+
+    val todayInsulinRecords = remember(rawInsulin, startOfToday) {
+        rawInsulin.filter { it.dateTimeMillis >= startOfToday }.sortedByDescending { it.dateTimeMillis }
+    }
+
+    val timeFormatter = remember { SimpleDateFormat("h:mm a", Locale.getDefault()) }
 
     var showProfileEditDialog by remember { mutableStateOf(false) }
+    val enabledReminders = remember(remindersList) { remindersList.filter { it.isEnabled }.take(3) }
 
     LazyColumn(
         modifier = Modifier
@@ -1963,90 +2017,355 @@ fun HomeScreen(
 
         }
 
-        // Today's Circular Dashboard Stats
+        // Today's Circular Dashboard Stats & Fresh Logs Dashboard
         item {
             Card(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().testTag("clinical_dashboard_card"),
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.tertiaryContainer)
+                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
             ) {
                 Column(
                     modifier = Modifier.padding(16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    Text(
-                        "Today's Overview",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
+                    // Header
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Icon(
+                                imageVector = Icons.Default.Assessment,
+                                contentDescription = "Dashboard Analytics Icon",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(22.dp)
+                            )
+                            Text(
+                                "Live Patient Dashboard",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                        Box(
+                            modifier = Modifier
+                                .background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(6.dp))
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Text(
+                                "TODAY'S INTENSITY",
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                letterSpacing = 0.5.sp
+                            )
+                        }
+                    }
 
+                    // Circular Charts for fast clinical visual feedback
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceEvenly,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // Average Glucose Ring representation
+                        // Average Glucose Ring
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Box(
-                                modifier = Modifier.size(90.dp),
+                                modifier = Modifier.size(80.dp),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Canvas(modifier = Modifier.size(80.dp)) {
+                                Canvas(modifier = Modifier.size(70.dp)) {
                                     drawCircle(
-                                        color = Color.LightGray.copy(alpha = 0.3f),
-                                        style = androidx.compose.ui.graphics.drawscope.Stroke(width = 8.dp.toPx())
+                                        color = Color.LightGray.copy(alpha = 0.2f),
+                                        style = androidx.compose.ui.graphics.drawscope.Stroke(width = 6.dp.toPx())
                                     )
                                     drawArc(
                                         color = if (reportsData.todayGlucoseAvg > profile.targetGlucoseMax || reportsData.todayGlucoseAvg < profile.targetGlucoseMin) Color(0xFFFF9800) else Color(0xFF4CAF50),
                                         startAngle = -90f,
                                         sweepAngle = (reportsData.todayGlucoseAvg.coerceIn(0.0, 300.0) / 300.0 * 360.0).toFloat(),
                                         useCenter = false,
-                                        style = androidx.compose.ui.graphics.drawscope.Stroke(width = 8.dp.toPx())
+                                        style = androidx.compose.ui.graphics.drawscope.Stroke(width = 6.dp.toPx())
                                     )
                                 }
                                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                     val avgText = if (reportsData.todayGlucoseAvg > 0) String.format(Locale.getDefault(), "%.0f", reportsData.todayGlucoseAvg) else "N/A"
-                                    Text(avgText, fontWeight = FontWeight.Bold, fontSize = 20.sp)
-                                    Text(profile.glucoseUnit, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
+                                    Text(avgText, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                                    Text(profile.glucoseUnit, fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
                                 }
                             }
-                            Spacer(modifier = Modifier.height(6.dp))
-                            Text("Avg Glucose", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text("Avg Glucose", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.outline)
                         }
 
-                        Divider(modifier = Modifier
-                            .height(60.dp)
-                            .width(1.dp))
+                        Divider(
+                            modifier = Modifier
+                                .height(50.dp)
+                                .width(1.dp),
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)
+                        )
 
-                        // Total Insulin Dosage taken
+                        // Total Insulin Dosage Ring
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Box(
-                                modifier = Modifier.size(90.dp),
+                                modifier = Modifier.size(80.dp),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Canvas(modifier = Modifier.size(80.dp)) {
+                                Canvas(modifier = Modifier.size(70.dp)) {
                                     drawCircle(
-                                        color = Color.LightGray.copy(alpha = 0.3f),
-                                        style = androidx.compose.ui.graphics.drawscope.Stroke(width = 8.dp.toPx())
+                                        color = Color.LightGray.copy(alpha = 0.2f),
+                                        style = androidx.compose.ui.graphics.drawscope.Stroke(width = 6.dp.toPx())
                                     )
                                     drawArc(
                                         color = Color(0xFF2196F3),
                                         startAngle = -90f,
                                         sweepAngle = (reportsData.todayInsulinTotal.coerceIn(0.0, 100.0) / 100.0 * 360.0).toFloat(),
                                         useCenter = false,
-                                        style = androidx.compose.ui.graphics.drawscope.Stroke(width = 8.dp.toPx())
+                                        style = androidx.compose.ui.graphics.drawscope.Stroke(width = 6.dp.toPx())
                                     )
                                 }
                                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Text(String.format(Locale.getDefault(), "%.1f", reportsData.todayInsulinTotal), fontWeight = FontWeight.Bold, fontSize = 20.sp)
-                                    Text("Units", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
+                                    Text(String.format(Locale.getDefault(), "%.1f", reportsData.todayInsulinTotal), fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                                    Text("Units", fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
                                 }
                             }
-                            Spacer(modifier = Modifier.height(6.dp))
-                            Text("Total Insulin Today", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text("Total Insulin", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.outline)
+                        }
+                    }
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+
+                    // 1. DYNAMIC RECENT GLUCOSE READINGS FEED
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Icon(
+                                    imageVector = Icons.Default.WaterDrop,
+                                    contentDescription = "Blood Sugar Readings List",
+                                    tint = MaterialTheme.colorScheme.tertiary,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Text(
+                                    text = if (todayGlucoseReadings.isNotEmpty()) "Recent Readings Today" else "Most Recent Readings",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                            if (todayGlucoseReadings.isNotEmpty()) {
+                                Box(
+                                    modifier = Modifier
+                                        .background(MaterialTheme.colorScheme.secondaryContainer, RoundedCornerShape(4.dp))
+                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                ) {
+                                    Text(
+                                        text = "${todayGlucoseReadings.size} logged today",
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                                    )
+                                }
+                            }
+                        }
+
+                        val activeFeed = if (todayGlucoseReadings.isNotEmpty()) todayGlucoseReadings else fallbackGlucoseReadings
+                        if (activeFeed.isEmpty()) {
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Outlined.Info,
+                                        contentDescription = "No records",
+                                        tint = MaterialTheme.colorScheme.outline,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Text(
+                                        "No glucose logs collected. Use quick actions to log blood sugar values.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.outline
+                                    )
+                                }
+                            }
+                        } else {
+                            activeFeed.forEach { reading ->
+                                val isOutOfRange = reading.readingValue < profile.targetGlucoseMin || reading.readingValue > profile.targetGlucoseMax
+                                val bubbleColor = if (isOutOfRange) Color(0xFFFF9800) else Color(0xFF4CAF50)
+                                val textValue = if (profile.glucoseUnit == "mmol/L") reading.readingValue else reading.readingValue.toInt().toString()
+
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f), RoundedCornerShape(8.dp))
+                                        .padding(vertical = 8.dp, horizontal = 12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(18.dp)
+                                                .background(bubbleColor, CircleShape)
+                                        )
+                                        Column {
+                                            Text(
+                                                text = "${reading.mealContext} Log",
+                                                style = MaterialTheme.typography.labelLarge,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                            if (reading.notes.isNotEmpty()) {
+                                                Text(
+                                                    text = reading.notes,
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.colorScheme.outline,
+                                                    maxLines = 1
+                                                )
+                                            }
+                                        }
+                                    }
+                                    Column(horizontalAlignment = Alignment.End) {
+                                        Text(
+                                            text = "$textValue ${profile.glucoseUnit}",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (isOutOfRange) Color(0xFFFB8C00) else MaterialTheme.colorScheme.onSurface
+                                        )
+                                        Text(
+                                            text = timeFormatter.format(Date(reading.dateTimeMillis)),
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.outline
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+
+                    // 2. DYNAMIC TODAY'S INSULIN DOSES FEED
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Icon(
+                                    imageVector = Icons.Default.Vaccines,
+                                    contentDescription = "Insulin Records",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Text(
+                                    text = "Insulin Doses Today",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                            if (todayInsulinRecords.isNotEmpty()) {
+                                Box(
+                                    modifier = Modifier
+                                        .background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(4.dp))
+                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                ) {
+                                    Text(
+                                        text = "${todayInsulinRecords.size} taken today",
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                                    )
+                                }
+                            }
+                        }
+
+                        if (todayInsulinRecords.isEmpty()) {
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Outlined.Info,
+                                        contentDescription = "No insulin doses today",
+                                        tint = MaterialTheme.colorScheme.outline,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Text(
+                                        "No insulin dosage logs collected for today. Log clinical doses above.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.outline
+                                    )
+                                }
+                            }
+                        } else {
+                            todayInsulinRecords.forEach { record ->
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f), RoundedCornerShape(8.dp))
+                                        .padding(vertical = 8.dp, horizontal = 12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        Box(
+                                            modifier = Modifier
+                                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f), CircleShape)
+                                                .padding(4.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Vaccines,
+                                                contentDescription = "Inject",
+                                                tint = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.size(14.dp)
+                                            )
+                                        }
+                                        Column {
+                                            Text(
+                                                text = record.insulinType,
+                                                style = MaterialTheme.typography.labelLarge,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                            if (record.notes.isNotEmpty()) {
+                                                Text(
+                                                    text = record.notes,
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.colorScheme.outline,
+                                                    maxLines = 1
+                                                )
+                                            }
+                                        }
+                                    }
+                                    Column(horizontalAlignment = Alignment.End) {
+                                        Text(
+                                            text = "${record.doseUnits} Units",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                        Text(
+                                            text = timeFormatter.format(Date(record.dateTimeMillis)),
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.outline
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -2067,7 +2386,6 @@ fun HomeScreen(
             }
         }
 
-        val enabledReminders = remindersList.filter { it.isEnabled }.take(3)
         if (enabledReminders.isEmpty()) {
             item {
                 Card(
@@ -2087,7 +2405,7 @@ fun HomeScreen(
                 }
             }
         } else {
-            items(enabledReminders) { rem ->
+            items(enabledReminders, key = { it.id }) { rem ->
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
@@ -2430,7 +2748,7 @@ fun HistoryScreen(
                     contentPadding = PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    items(insulinList) { rec ->
+                    items(insulinList, key = { it.id }) { rec ->
                         InsulinRecordCard(
                             rec = rec,
                             onEdit = { onEditInsulin(rec) },
@@ -2520,7 +2838,7 @@ fun HistoryScreen(
                     contentPadding = PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    items(glucoseList) { reading ->
+                    items(glucoseList, key = { it.id }) { reading ->
                         GlucoseReadingCard(
                             reading = reading,
                             profile = profile,
@@ -2611,7 +2929,7 @@ fun HistoryScreen(
                     contentPadding = PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    items(filteredBpList) { record ->
+                    items(filteredBpList, key = { it.id }) { record ->
                         BloodPressureRecordCard(
                             record = record,
                             onEdit = { onEditBloodPressure(record) },
@@ -2701,7 +3019,7 @@ fun HistoryScreen(
                     contentPadding = PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    items(filteredRefillLogs) { log ->
+                    items(filteredRefillLogs, key = { it.id }) { log ->
                         RefillLogCard(
                             log = log,
                             onEdit = { onEditRefill(log) },
@@ -3156,7 +3474,7 @@ fun RemindersScreen(
                     contentPadding = PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    items(remindersList) { alert ->
+                    items(remindersList, key = { it.id }) { alert ->
                         ReminderCard(
                             target = alert,
                             onToggle = { viewModel.toggleReminder(alert) },
@@ -3300,7 +3618,46 @@ fun ReportsScreen(viewModel: GlucoViewModel) {
     val pdfCustomToDate by viewModel.pdfCustomToDate.collectAsStateWithLifecycle()
 
     val context = LocalContext.current
-    val summary = viewModel.getReportsData(rawInsulin, rawGlucose, profile)
+    val summary = remember(rawInsulin, rawGlucose, profile) {
+        viewModel.getReportsData(rawInsulin, rawGlucose, profile)
+    }
+
+    val recentGlucoseTrend = remember(rawGlucose) {
+        rawGlucose.sortedBy { it.dateTimeMillis }.takeLast(8)
+    }
+
+    val isMmolVal = profile.glucoseUnit == "mmol/L"
+    val lineGraphData = remember(recentGlucoseTrend, profile) {
+        if (recentGlucoseTrend.size < 2) return@remember null
+        val targetMin = profile.targetGlucoseMin
+        val targetMax = profile.targetGlucoseMax
+        
+        // Define boundaries
+        val minReading = recentGlucoseTrend.map { it.readingValue }.minOrNull() ?: 50.0
+        val maxReading = recentGlucoseTrend.map { it.readingValue }.maxOrNull() ?: 180.0
+        
+        val minVal = minReading.coerceAtMost(targetMin).coerceAtLeast(10.0) - 10.0
+        val maxVal = maxReading.coerceAtLeast(targetMax) + 20.0
+        val range = maxVal - minVal
+        
+        val points = recentGlucoseTrend.mapIndexed { idx, item ->
+            val xFraction = if (recentGlucoseTrend.size > 1) idx.toFloat() / (recentGlucoseTrend.size - 1) else 0.5f
+            val yFraction = if (range > 0) ((item.readingValue - minVal) / range).toFloat() else 0.5f
+            Pair(xFraction, yFraction)
+        }
+        
+        val minFraction = if (range > 0) ((targetMin - minVal) / range).toFloat() else 0.3f
+        val maxFraction = if (range > 0) ((targetMax - minVal) / range).toFloat() else 0.7f
+        
+        GlucoseGraphLayout(
+            points = points,
+            minFraction = minFraction,
+            maxFraction = maxFraction,
+            originalTrend = recentGlucoseTrend,
+            minVal = minVal,
+            maxVal = maxVal
+        )
+    }
 
     fun showDatePicker(initialDateStr: String, onDateSelected: (String) -> Unit) {
         val calendar = java.util.Calendar.getInstance()
@@ -3420,6 +3777,263 @@ fun ReportsScreen(viewModel: GlucoViewModel) {
                         TirLegendItem(color = Color(0xFF2196F3), label = "Low", value = "${summary.percentLow.toInt()}%")
                         TirLegendItem(color = Color(0xFF4CAF50), label = "In-Range (${profile.targetGlucoseMin.toInt()}-${profile.targetGlucoseMax.toInt()})", value = "${summary.percentInRange.toInt()}%")
                         TirLegendItem(color = Color(0xFFE91E63), label = "High", value = "${summary.percentHigh.toInt()}%")
+                    }
+                }
+            }
+        }
+
+        // Blood Glucose Trend Line Chart (Bezier Trend Line)
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth().testTag("glucose_trend_line_chart_card"),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.tertiaryContainer)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.ShowChart,
+                                contentDescription = "Trend Line Chart Icon",
+                                tint = MaterialTheme.colorScheme.tertiary,
+                                modifier = Modifier.size(22.dp)
+                            )
+                            Text(
+                                "Glucose Level Trend",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                        Box(
+                            modifier = Modifier
+                                .background(MaterialTheme.colorScheme.tertiaryContainer, RoundedCornerShape(6.dp))
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Text(
+                                "LAST ${recentGlucoseTrend.size} ENTRIES",
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onTertiaryContainer,
+                                letterSpacing = 0.5.sp
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    if (recentGlucoseTrend.size < 2) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(160.dp)
+                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f), RoundedCornerShape(12.dp)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                                modifier = Modifier.padding(16.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Analytics,
+                                    contentDescription = "Trend Pending",
+                                    tint = MaterialTheme.colorScheme.outline,
+                                    modifier = Modifier.size(36.dp)
+                                )
+                                Text(
+                                    "Clinical Trend Analysis Pending",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    "Please log at least 2 blood sugar readings to visualize your glucose level trends over time automatically.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.outline,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
+                        }
+                    } else {
+                        val graphData = lineGraphData!!
+                        val textMeasurer = rememberTextMeasurer()
+                        val tertiaryColor = MaterialTheme.colorScheme.tertiary
+                        val textStyleValue = MaterialTheme.typography.labelSmall.copy(
+                            color = MaterialTheme.colorScheme.onSurface,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 9.sp
+                        )
+                        val textStyleLimit = MaterialTheme.typography.labelSmall.copy(
+                            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.8f),
+                            fontSize = 8.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+
+                        Canvas(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(160.dp)
+                        ) {
+                            val width = size.width
+                            val height = size.height
+                            
+                            val leftPadding = 20f
+                            val rightPadding = 20f
+                            val effectiveWidth = width - leftPadding - rightPadding
+                            
+                            val pixelPoints = graphData.points.map { (xFract, yFract) ->
+                                Offset(
+                                    x = leftPadding + (xFract * effectiveWidth),
+                                    y = height - (yFract * height)
+                                )
+                            }
+                            
+                            val minPixelY = height - (graphData.minFraction * height)
+                            val maxPixelY = height - (graphData.maxFraction * height)
+                            
+                            // Draw target range background (emerald tint)
+                            drawRect(
+                                color = Color(0xFF4CAF50).copy(alpha = 0.06f),
+                                topLeft = Offset(0f, maxPixelY),
+                                size = Size(width, (minPixelY - maxPixelY).coerceAtLeast(1f))
+                            )
+                            
+                            val dashEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(12f, 12f), 0f)
+                            
+                            // Lower limit line & text
+                            drawLine(
+                                color = Color(0xFF2196F3).copy(alpha = 0.4f),
+                                start = Offset(0f, minPixelY),
+                                end = Offset(width, minPixelY),
+                                strokeWidth = 2f,
+                                pathEffect = dashEffect
+                            )
+                            val lowLimitTxt = "Target Min: ${profile.targetGlucoseMin.toInt()} ${profile.glucoseUnit}"
+                            val measuredLow = textMeasurer.measure(lowLimitTxt, textStyleLimit)
+                            drawText(
+                                textLayoutResult = measuredLow,
+                                topLeft = Offset(12f, (minPixelY - measuredLow.size.height - 2f).coerceAtLeast(0f))
+                            )
+
+                            // Upper limit line & text
+                            drawLine(
+                                color = Color(0xFFE91E63).copy(alpha = 0.4f),
+                                start = Offset(0f, maxPixelY),
+                                end = Offset(width, maxPixelY),
+                                strokeWidth = 2f,
+                                pathEffect = dashEffect
+                            )
+                            val highLimitTxt = "Target Max: ${profile.targetGlucoseMax.toInt()} ${profile.glucoseUnit}"
+                            val measuredHigh = textMeasurer.measure(highLimitTxt, textStyleLimit)
+                            drawText(
+                                textLayoutResult = measuredHigh,
+                                topLeft = Offset(12f, (maxPixelY + 2f).coerceAtMost(height - measuredHigh.size.height))
+                            )
+                            
+                            // Curve
+                            val path = Path()
+                            if (pixelPoints.isNotEmpty()) {
+                                path.moveTo(pixelPoints[0].x, pixelPoints[0].y)
+                                for (i in 1 until pixelPoints.size) {
+                                    val prev = pixelPoints[i - 1]
+                                    val curr = pixelPoints[i]
+                                    val control1 = Offset(prev.x + (curr.x - prev.x) / 2f, prev.y)
+                                    val control2 = Offset(prev.x + (curr.x - prev.x) / 2f, curr.y)
+                                    path.cubicTo(control1.x, control1.y, control2.x, control2.y, curr.x, curr.y)
+                                }
+                                
+                                val fillPath = Path().apply {
+                                    addPath(path)
+                                    lineTo(pixelPoints.last().x, height)
+                                    lineTo(pixelPoints.first().x, height)
+                                    close()
+                                }
+                                drawPath(
+                                    path = fillPath,
+                                    brush = androidx.compose.ui.graphics.Brush.verticalGradient(
+                                        colors = listOf(
+                                            tertiaryColor.copy(alpha = 0.28f),
+                                            tertiaryColor.copy(alpha = 0.00f)
+                                        ),
+                                        startY = pixelPoints.map { it.y }.minOrNull() ?: 0f,
+                                        endY = height
+                                    )
+                                )
+                                
+                                drawPath(
+                                    path = path,
+                                    color = tertiaryColor,
+                                    style = androidx.compose.ui.graphics.drawscope.Stroke(
+                                        width = 3.dp.toPx(),
+                                        cap = androidx.compose.ui.graphics.StrokeCap.Round,
+                                        join = androidx.compose.ui.graphics.StrokeJoin.Round
+                                    )
+                                )
+                                
+                                pixelPoints.forEachIndexed { index, pt ->
+                                    val reading = graphData.originalTrend[index]
+                                    val isOutOfRange = reading.readingValue < profile.targetGlucoseMin || reading.readingValue > profile.targetGlucoseMax
+                                    val dotColor = if (isOutOfRange) Color(0xFFFF9800) else Color(0xFF43A047)
+                                    
+                                    drawCircle(
+                                        color = dotColor.copy(alpha = 0.25f),
+                                        radius = 7.dp.toPx(),
+                                        center = pt
+                                    )
+                                    drawCircle(
+                                        color = Color.White,
+                                        radius = 4.dp.toPx(),
+                                        center = pt
+                                    )
+                                    drawCircle(
+                                        color = dotColor,
+                                        radius = 2.5.dp.toPx(),
+                                        center = pt
+                                    )
+                                    
+                                    val displayVal = if (isMmolVal) reading.readingValue.toString() else reading.readingValue.toInt().toString()
+                                    val measuredVal = textMeasurer.measure(displayVal, textStyleValue)
+                                    drawText(
+                                        textLayoutResult = measuredVal,
+                                        topLeft = Offset(
+                                            x = pt.x - (measuredVal.size.width / 2f),
+                                            y = (pt.y - measuredVal.size.height - 4f).coerceAtLeast(0f)
+                                        )
+                                    )
+                                }
+                            }
+                        }
+                        
+                        Spacer(modifier = Modifier.height(8.dp))
+                        
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            recentGlucoseTrend.forEach { reading ->
+                                val label = remember(reading.dateTimeMillis) {
+                                    SimpleDateFormat("M/d HH:mm", Locale.getDefault()).format(Date(reading.dateTimeMillis))
+                                }
+                                Text(
+                                    text = label,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontSize = 7.5.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.outline,
+                                    modifier = Modifier.weight(1f),
+                                    textAlign = TextAlign.Center
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -3983,7 +4597,7 @@ fun ProfileScreen(viewModel: GlucoViewModel) {
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
                     ) {
-                        items(savedProfiles) { profile ->
+                        items(savedProfiles, key = { it.id }) { profile ->
                             val isActive = profile.isActive || profile.id == currentProfile.id
                             val context = LocalContext.current
                             val prefs = remember { context.getSharedPreferences("gluco_auth_prefs", android.content.Context.MODE_PRIVATE) }
@@ -4298,192 +4912,7 @@ fun ProfileScreen(viewModel: GlucoViewModel) {
             }
         }
 
-        // Clinical Backend Synchronization DashboardCard
-        item {
-            val isSyncing by viewModel.isSyncing.collectAsStateWithLifecycle()
-            val syncMessage by viewModel.syncMessage.collectAsStateWithLifecycle()
-            val lastSyncTime by viewModel.lastSyncTime.collectAsStateWithLifecycle()
-            val backendUrl by viewModel.backendBaseUrl.collectAsStateWithLifecycle()
-            val syncConsoleLog by viewModel.syncConsoleLog.collectAsStateWithLifecycle()
 
-            var inputUrl by remember { mutableStateOf(backendUrl) }
-            var isConsoleExpanded by remember { mutableStateOf(false) }
-
-            // Sync with profile setting
-            LaunchedEffect(backendUrl) {
-                inputUrl = backendUrl
-            }
-
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("backend_sync_card"),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primaryContainer)
-            ) {
-                Column(
-                    modifier = Modifier.padding(14.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Icon(
-                                imageVector = Icons.Default.Cloud,
-                                contentDescription = "Sync Cloud Logo",
-                                tint = MaterialTheme.colorScheme.primary
-                            )
-                            Text(
-                                text = "Clinical Database Sync",
-                                fontWeight = FontWeight.Bold,
-                                style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-
-                        if (isSyncing) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(16.dp),
-                                strokeWidth = 2.dp,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        } else {
-                            Box(
-                                modifier = Modifier
-                                    .background(
-                                        if (lastSyncTime == "Never") MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f) 
-                                        else MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f), 
-                                        RoundedCornerShape(6.dp)
-                                    )
-                                    .padding(horizontal = 8.dp, vertical = 4.dp)
-                            ) {
-                                Text(
-                                    text = if (lastSyncTime == "Never") "NOT SECURED" else "SECURED",
-                                    color = if (lastSyncTime == "Never") MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        }
-                    }
-
-                    Text(
-                        text = "Synchronize local clinical parameters, logged glucose charts, insulin doses, blood pressure logs, and schedule reminders with your healthcare server network.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.outline
-                    )
-
-                    // URL config text field
-                    OutlinedTextField(
-                        value = inputUrl,
-                        onValueChange = { 
-                            inputUrl = it 
-                            viewModel.setBackendBaseUrl(it)
-                        },
-                        label = { Text("Clinical Service Base URL") },
-                        placeholder = { Text("https://httpbin.org/ or custom clinical api") },
-                        singleLine = true,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("sync_base_url_input"),
-                        shape = RoundedCornerShape(10.dp),
-                        leadingIcon = {
-                            Icon(Icons.Default.Dns, contentDescription = "Server URL Config Icon", modifier = Modifier.size(18.dp))
-                        }
-                    )
-
-                    // Status details card
-                    Card(
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)),
-                        shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(10.dp),
-                            verticalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Text("Last Synced:", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
-                                Text(lastSyncTime, style = MaterialTheme.typography.bodySmall)
-                            }
-                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Text("Sync Status:", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
-                                Text(syncMessage ?: "Ready", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
-                            }
-                        }
-                    }
-
-                    Button(
-                        onClick = { viewModel.triggerUploadSync() },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(44.dp)
-                            .testTag("trigger_sync_button"),
-                        shape = RoundedCornerShape(10.dp),
-                        enabled = !isSyncing
-                    ) {
-                        Icon(Icons.Default.CloudUpload, contentDescription = "Backup Database Icon", modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(if (isSyncing) "Synchronizing Logs..." else "Upload Clinical Data", fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                    }
-
-                    // Console Log Expansion
-                    if (syncConsoleLog.isNotEmpty()) {
-                        HorizontalDivider(
-                            modifier = Modifier.fillMaxWidth(),
-                            thickness = 1.dp,
-                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-                        )
-
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { isConsoleExpanded = !isConsoleExpanded }
-                                .padding(vertical = 4.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "Raw JSON Payload Console Log",
-                                style = MaterialTheme.typography.labelLarge,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                            Icon(
-                                imageVector = if (isConsoleExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                                contentDescription = "Toggle payload terminal log",
-                                tint = MaterialTheme.colorScheme.primary
-                            )
-                        }
-
-                        if (isConsoleExpanded) {
-                            Card(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .heightIn(max = 240.dp),
-                                shape = RoundedCornerShape(8.dp),
-                                colors = CardDefaults.cardColors(containerColor = Color(0xFF19191E)),
-                                border = BorderStroke(1.dp, Color(0xFF2B2B33))
-                            ) {
-                                Column(modifier = Modifier.padding(10.dp)) {
-                                    Text(
-                                        text = syncConsoleLog,
-                                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                                        fontSize = 11.sp,
-                                        color = Color(0xFFDCDCAA),
-                                        modifier = Modifier.verticalScroll(rememberScrollState())
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
         
 
 
@@ -4515,102 +4944,212 @@ fun InsulinFormDialog(
                 .fillMaxWidth()
                 .padding(12.dp)
                 .testTag("insulin_dialog"),
-            shape = RoundedCornerShape(16.dp)
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
         ) {
             Column(
                 modifier = Modifier
-                    .padding(20.dp)
+                    .padding(18.dp)
                     .fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                Text(
-                    text = if (viewModel.selectedInsulinIdToEdit != null) "Edit Insulin Dose" else "Add Insulin Dose",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold
-                )
-
-                // Segments selection for Insulin type
-                Text("Insulin Type", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.outline)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    val types = listOf("Rapid-acting", "Long-acting", "Intermediate", "Short-acting")
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                            types.take(2).forEach { t ->
-                                val active = type == t
-                                Button(
-                                    modifier = Modifier.weight(1f),
-                                    onClick = { type = t },
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
-                                        contentColor = if (active) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                ) {
-                                    Text(t, fontSize = 11.sp, maxLines = 1)
-                                }
-                            }
+                    Icon(
+                        imageVector = Icons.Default.Vaccines,
+                        contentDescription = "Insulin Icon",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Text(
+                        text = if (viewModel.selectedInsulinIdToEdit != null) "Edit Insulin Dose" else "Add Insulin Dose",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+
+                // 1. DOSE UNITS CARD SECTION
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.15f)),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.25f))
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Add,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Text(
+                                "Intake Unit Size",
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
                         }
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                            types.drop(2).forEach { t ->
-                                val active = type == t
-                                Button(
-                                    modifier = Modifier.weight(1f),
-                                    onClick = { type = t },
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
-                                        contentColor = if (active) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                ) {
-                                    Text(t, fontSize = 11.sp, maxLines = 1)
+                        OutlinedTextField(
+                            value = dose,
+                            onValueChange = { dose = it },
+                            label = { Text("Dose Intake (Units)") },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("insulin_dose_units_input"),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            shape = RoundedCornerShape(10.dp),
+                            singleLine = true,
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedContainerColor = MaterialTheme.colorScheme.surface,
+                                unfocusedContainerColor = MaterialTheme.colorScheme.surface
+                            )
+                        )
+                    }
+                }
+
+                // 2. INSULIN TYPE SELECTOR CARD SECTION
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            "Insulin Type Select",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            val types = listOf("Rapid-acting", "Long-acting", "Intermediate", "Short-acting")
+                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    types.take(2).forEach { t ->
+                                        val active = type == t
+                                        Button(
+                                            modifier = Modifier.weight(1f),
+                                            onClick = { type = t },
+                                            shape = RoundedCornerShape(8.dp),
+                                            contentPadding = PaddingValues(vertical = 8.dp),
+                                            colors = ButtonDefaults.buttonColors(
+                                                containerColor = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                                                contentColor = if (active) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        ) {
+                                            Text(t, fontSize = 11.sp, maxLines = 1)
+                                        }
+                                    }
+                                }
+                                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    types.drop(2).forEach { t ->
+                                        val active = type == t
+                                        Button(
+                                            modifier = Modifier.weight(1f),
+                                            onClick = { type = t },
+                                            shape = RoundedCornerShape(8.dp),
+                                            contentPadding = PaddingValues(vertical = 8.dp),
+                                            colors = ButtonDefaults.buttonColors(
+                                                containerColor = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                                                contentColor = if (active) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        ) {
+                                            Text(t, fontSize = 11.sp, maxLines = 1)
+                                        }
+                                    }
                                 }
                             }
                         }
                     }
                 }
 
-                // Dose units textfield
-                OutlinedTextField(
-                    value = dose,
-                    onValueChange = { dose = it },
-                    label = { Text("Dose Intake (Units)") },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag("insulin_dose_units_input"),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
-                )
-
-                Row(
+                // 3. LOG TIMINGS & DETAILS CARD SECTION
+                Card(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.15f)),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
                 ) {
-                    OutlinedTextField(
-                        value = date,
-                        onValueChange = { date = it },
-                        label = { Text("Date (YYYY-MM-DD)") },
-                        modifier = Modifier.weight(1.2f)
-                    )
-                    OutlinedTextField(
-                        value = time,
-                        onValueChange = { time = it },
-                        label = { Text("Time (HH:MM)") },
-                        modifier = Modifier.weight(0.8f)
-                    )
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Event,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.outline,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Text(
+                                "Date & Timeline Info",
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            OutlinedTextField(
+                                value = date,
+                                onValueChange = { date = it },
+                                label = { Text("Date (YYYY-MM-DD)") },
+                                modifier = Modifier.weight(1.2f),
+                                shape = RoundedCornerShape(10.dp),
+                                singleLine = true
+                            )
+                            OutlinedTextField(
+                                value = time,
+                                onValueChange = { time = it },
+                                label = { Text("Time (HH:MM)") },
+                                modifier = Modifier.weight(0.8f),
+                                shape = RoundedCornerShape(10.dp),
+                                singleLine = true
+                            )
+                        }
+
+                        OutlinedTextField(
+                            value = notes,
+                            onValueChange = { notes = it },
+                            label = { Text("Notes (e.g., Post lunch snack, pre workout)") },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(10.dp),
+                            maxLines = 2
+                        )
+                    }
                 }
 
-                OutlinedTextField(
-                    value = notes,
-                    onValueChange = { notes = it },
-                    label = { Text("Notes (e.g., Post lunch snack, pre workout)") },
-                    modifier = Modifier.fillMaxWidth()
-                )
-
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    TextButton(onClick = onDismiss) {
+                    TextButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.height(42.dp)
+                    ) {
                         Text("Cancel")
                     }
                     Spacer(modifier = Modifier.width(8.dp))
@@ -4623,9 +5162,11 @@ fun InsulinFormDialog(
                             viewModel.insNotes = notes.trim()
                             onSave()
                         },
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.height(42.dp),
                         enabled = dose.trim().toDoubleOrNull() != null
                     ) {
-                        Text("Save")
+                        Text("Save Details")
                     }
                 }
             }
@@ -4640,11 +5181,36 @@ fun GlucoseFormDialog(
     onDismiss: () -> Unit,
     onSave: () -> Unit
 ) {
+    val profile by viewModel.userProfile.collectAsStateWithLifecycle()
+    val isMmolVal = profile.glucoseUnit == "mmol/L"
+
     var value by remember { mutableStateOf(viewModel.glucValue) }
     var context by remember { mutableStateOf(viewModel.glucMealContext.ifEmpty { "Fasting" }) }
     var date by remember { mutableStateOf(viewModel.glucDate.ifEmpty { viewModel.formatEpochToDateOnly(viewModel.getCurrentTimeMillis()) }) }
     var time by remember { mutableStateOf(viewModel.glucTime.ifEmpty { viewModel.formatEpochToTimeOnly(viewModel.getCurrentTimeMillis()) }) }
     var notes by remember { mutableStateOf(viewModel.glucNotes) }
+
+    val (isError, errorMessage) = remember(value, isMmolVal) {
+        val trimmed = value.trim()
+        val num = trimmed.toDoubleOrNull()
+        when {
+            trimmed.isEmpty() -> {
+                true to "Glucose reading cannot be empty"
+            }
+            num == null -> {
+                true to "Please enter a valid numeric level"
+            }
+            isMmolVal && (num < 1.1 || num > 35.0) -> {
+                true to "Realistic range for mmol/L is 1.1 - 35.0"
+            }
+            !isMmolVal && (num < 20.0 || num > 600.0) -> {
+                true to "Realistic range for mg/dL is 20 - 600"
+            }
+            else -> {
+                false to ""
+            }
+        }
+    }
 
     Dialog(onDismissRequest = onDismiss) {
         Card(
@@ -4652,99 +5218,227 @@ fun GlucoseFormDialog(
                 .fillMaxWidth()
                 .padding(12.dp)
                 .testTag("glucose_dialog"),
-            shape = RoundedCornerShape(16.dp)
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
         ) {
             Column(
                 modifier = Modifier
-                    .padding(20.dp)
+                    .padding(18.dp)
                     .fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                Text(
-                    text = if (viewModel.selectedGlucoseIdToEdit != null) "Edit Glucose Reading" else "Add Glucose Reading",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.WaterDrop,
+                        contentDescription = "Glucose Sugar Icon",
+                        tint = MaterialTheme.colorScheme.tertiary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Text(
+                        text = if (viewModel.selectedGlucoseIdToEdit != null) "Edit Glucose Reading" else "Add Glucose Reading",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
 
-                OutlinedTextField(
-                    value = value,
-                    onValueChange = { value = it },
-                    label = { Text("Glucose Level Reading") },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag("glucose_value_input"),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
-                )
+                // 1. GLUCOSE LEVEL VALUE INPUT CARD
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.15f)),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.tertiary.copy(alpha = 0.25f))
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Add,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.tertiary,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Text(
+                                "Blood Sugar Level",
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onTertiaryContainer
+                            )
+                        }
+                        OutlinedTextField(
+                            value = value,
+                            onValueChange = { value = it },
+                            label = { Text("Glucose Level Reading") },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("glucose_value_input"),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            shape = RoundedCornerShape(10.dp),
+                            singleLine = true,
+                            isError = isError,
+                            supportingText = {
+                                if (isError) {
+                                    Text(
+                                        text = errorMessage,
+                                        color = MaterialTheme.colorScheme.error,
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
+                                } else {
+                                    Text(
+                                        text = "Unit type: ${profile.glucoseUnit} (Realistic range)",
+                                        color = MaterialTheme.colorScheme.outline,
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
+                                }
+                            },
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedContainerColor = MaterialTheme.colorScheme.surface,
+                                unfocusedContainerColor = MaterialTheme.colorScheme.surface
+                            )
+                        )
+                    }
+                }
 
-                Text("Meal Context", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.outline)
+                // 2. MEAL CONTEXT CHIPS CARD
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            "Meal Context Check",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
 
-                // Custom context selection chips
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    val contextOptionList = listOf("Fasting", "Before Meal", "After Meal", "Bedtime", "Other")
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        contextOptionList.take(3).forEach { contextVal ->
-                            val active = context == contextVal
-                            Button(
-                                modifier = Modifier.weight(1f),
-                                onClick = { context = contextVal },
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = if (active) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.surfaceVariant,
-                                    contentColor = if (active) MaterialTheme.colorScheme.onTertiary else MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            ) {
-                                Text(contextVal, fontSize = 10.sp, maxLines = 1)
+                        // Custom context selection chips in card grid
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            val contextOptionList = listOf("Fasting", "Before Meal", "After Meal", "Bedtime", "Other")
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                contextOptionList.take(3).forEach { contextVal ->
+                                    val active = context == contextVal
+                                    Button(
+                                        modifier = Modifier.weight(1f),
+                                        onClick = { context = contextVal },
+                                        shape = RoundedCornerShape(8.dp),
+                                        contentPadding = PaddingValues(vertical = 8.dp),
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = if (active) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.surfaceVariant,
+                                            contentColor = if (active) MaterialTheme.colorScheme.onTertiary else MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    ) {
+                                        Text(contextVal, fontSize = 10.sp, maxLines = 1)
+                                    }
+                                }
+                            }
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                contextOptionList.drop(3).forEach { contextVal ->
+                                    val active = context == contextVal
+                                    Button(
+                                        modifier = Modifier.weight(1f),
+                                        onClick = { context = contextVal },
+                                        shape = RoundedCornerShape(8.dp),
+                                        contentPadding = PaddingValues(vertical = 8.dp),
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = if (active) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.surfaceVariant,
+                                            contentColor = if (active) MaterialTheme.colorScheme.onTertiary else MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    ) {
+                                        Text(contextVal, fontSize = 10.sp, maxLines = 1)
+                                    }
+                                }
+                                // placeholder balance
+                                Spacer(modifier = Modifier.weight(1f))
                             }
                         }
                     }
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        contextOptionList.drop(3).forEach { contextVal ->
-                            val active = context == contextVal
-                            Button(
-                                modifier = Modifier.weight(1f),
-                                onClick = { context = contextVal },
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = if (active) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.surfaceVariant,
-                                    contentColor = if (active) MaterialTheme.colorScheme.onTertiary else MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            ) {
-                                Text(contextVal, fontSize = 10.sp, maxLines = 1)
-                            }
+                }
+
+                // 3. DATETIME AND NOTES SECTION CARD
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.15f)),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Event,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.outline,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Text(
+                                "Date & Timeline Info",
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
-                        // placeholder balance
-                        Spacer(modifier = Modifier.weight(1f))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            OutlinedTextField(
+                                value = date,
+                                onValueChange = { date = it },
+                                label = { Text("Date (YYYY-MM-DD)") },
+                                modifier = Modifier.weight(1.2f),
+                                shape = RoundedCornerShape(10.dp),
+                                singleLine = true
+                            )
+                            OutlinedTextField(
+                                value = time,
+                                onValueChange = { time = it },
+                                label = { Text("Time (HH:MM)") },
+                                modifier = Modifier.weight(0.8f),
+                                shape = RoundedCornerShape(10.dp),
+                                singleLine = true
+                            )
+                        }
+
+                        OutlinedTextField(
+                            value = notes,
+                            onValueChange = { notes = it },
+                            label = { Text("Notes (e.g., Checked with fingerstick)") },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(10.dp),
+                            maxLines = 2
+                        )
                     }
                 }
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    OutlinedTextField(
-                        value = date,
-                        onValueChange = { date = it },
-                        label = { Text("Date (YYYY-MM-DD)") },
-                        modifier = Modifier.weight(1.2f)
-                    )
-                    OutlinedTextField(
-                        value = time,
-                        onValueChange = { time = it },
-                        label = { Text("Time (HH:MM)") },
-                        modifier = Modifier.weight(0.8f)
-                    )
-                }
-
-                OutlinedTextField(
-                    value = notes,
-                    onValueChange = { notes = it },
-                    label = { Text("Notes (e.g., Checked with fingerstick)") },
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End
-                ) {
-                    TextButton(onClick = onDismiss) {
+                    TextButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.height(42.dp)
+                    ) {
                         Text("Cancel")
                     }
                     Spacer(modifier = Modifier.width(8.dp))
@@ -4757,9 +5451,11 @@ fun GlucoseFormDialog(
                             viewModel.glucNotes = notes.trim()
                             onSave()
                         },
-                        enabled = value.trim().toDoubleOrNull() != null
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.height(42.dp),
+                        enabled = !isError
                     ) {
-                        Text("Save")
+                        Text("Save Details")
                     }
                 }
             }

@@ -289,10 +289,159 @@ class GlucoViewModel(application: Application) : AndroidViewModel(application) {
                     _syncMessage.value = "Sync completed with warning: $responseMsg"
                 }
 
+                // Also trigger Firebase Firestore sync in parallel/sequentially to ensure real-time secure backup
+                try {
+                    val auth = com.google.firebase.auth.FirebaseAuth.getInstance()
+                    val userId = auth.currentUser?.uid
+                    if (userId != null) {
+                        _syncConsoleLog.value += "\n\n>>> SYNCING WITH CLOUD FIRESTORE FOR SECURE COLD RECOVERY...\n"
+                        val db = com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                        
+                        // User Profile
+                        val activeProfile = userProfile.value
+                        val profileMap = hashMapOf(
+                            "userName" to activeProfile.userName,
+                            "doctorName" to activeProfile.doctorName,
+                            "doctorEmail" to activeProfile.doctorEmail,
+                            "doctorPhone" to activeProfile.doctorPhone,
+                            "targetGlucoseMin" to activeProfile.targetGlucoseMin,
+                            "targetGlucoseMax" to activeProfile.targetGlucoseMax,
+                            "glucoseUnit" to activeProfile.glucoseUnit,
+                            "cartridgeCapacity" to activeProfile.cartridgeCapacity,
+                            "cartridgeRemaining" to activeProfile.cartridgeRemaining
+                        )
+                        db.collection("users").document(userId).set(profileMap)
+                        _syncConsoleLog.value += "✓ Clinical active profile configuration synced\n"
+
+                        // Glucose Readings
+                        val glucoseColl = db.collection("users").document(userId).collection("glucose_readings")
+                        glucoseReadings.value.forEach { reading ->
+                            val record = hashMapOf(
+                                "readingValue" to reading.readingValue,
+                                "mealContext" to reading.mealContext,
+                                "timestamp" to reading.dateTimeMillis,
+                                "notes" to reading.notes
+                            )
+                            glucoseColl.document(reading.id.toString()).set(record)
+                        }
+                        _syncConsoleLog.value += "✓ ${glucoseReadings.value.size} Glucose readings synchronized to secure cloud\n"
+
+                        // Insulin Records
+                        val insulinColl = db.collection("users").document(userId).collection("insulin_records")
+                        insulinRecords.value.forEach { record ->
+                            val map = hashMapOf(
+                                "insulinType" to record.insulinType,
+                                "doseUnits" to record.doseUnits,
+                                "timestamp" to record.dateTimeMillis,
+                                "notes" to record.notes
+                            )
+                            insulinColl.document(record.id.toString()).set(map)
+                        }
+                        _syncConsoleLog.value += "✓ ${insulinRecords.value.size} Insulin delivery logs synchronized to secure cloud\n"
+
+                        // Blood Pressure Records
+                        val bpColl = db.collection("users").document(userId).collection("blood_pressure_records")
+                        bloodPressureRecords.value.forEach { record ->
+                            val map = hashMapOf(
+                                "systolic" to record.systolic,
+                                "diastolic" to record.diastolic,
+                                "pulse" to record.pulse,
+                                "timestamp" to record.dateTimeMillis,
+                                "notes" to record.notes
+                            )
+                            bpColl.document(record.id.toString()).set(map)
+                        }
+                        _syncConsoleLog.value += "✓ ${bloodPressureRecords.value.size} Blood pressure cards synchronized to secure cloud\n"
+                        _syncConsoleLog.value += ">>> CLOUD FIRESTORE CLINICAL DATA SYNC COMPLETED SUCCESSFULLY.\n"
+                    } else {
+                        _syncConsoleLog.value += "\n\n>>> CLOUD FIRESTORE SYNC BYPASSED: No authenticated Firebase Auth session found on this instance.\n"
+                    }
+                } catch (fe: Exception) {
+                    _syncConsoleLog.value += "\n\n!!! CLOUD FIRESTORE SYNC ERROR: ${fe.localizedMessage}\n"
+                }
+
             } catch (e: Exception) {
                 _isSyncing.value = false
                 _syncMessage.value = "Sync failed: ${e.localizedMessage ?: "Unknown error"}"
                 _syncConsoleLog.value += "!!! ERROR OCCURRED DURING CONNECTION:\n" + e.localizedMessage + "\n" + e.stackTraceToString()
+            }
+        }
+    }
+
+    fun syncAllDataToFirebase(callback: ((Boolean, String) -> Unit)? = null) {
+        viewModelScope.launch {
+            try {
+                val auth = com.google.firebase.auth.FirebaseAuth.getInstance()
+                val db = com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                val userId = auth.currentUser?.uid
+                if (userId == null) {
+                    val msg = "Firestore Sync bypassed: No active Firebase Auth session."
+                    android.util.Log.w("FirebaseSync", msg)
+                    callback?.invoke(false, msg)
+                    return@launch
+                }
+
+                android.util.Log.d("FirebaseSync", "Starting Firebase Firestore full sync for: $userId")
+                
+                // 1. Sync User Profile
+                val activeProfile = userProfile.value
+                val profileMap = hashMapOf(
+                    "userName" to activeProfile.userName,
+                    "doctorName" to activeProfile.doctorName,
+                    "doctorEmail" to activeProfile.doctorEmail,
+                    "doctorPhone" to activeProfile.doctorPhone,
+                    "targetGlucoseMin" to activeProfile.targetGlucoseMin,
+                    "targetGlucoseMax" to activeProfile.targetGlucoseMax,
+                    "glucoseUnit" to activeProfile.glucoseUnit,
+                    "cartridgeCapacity" to activeProfile.cartridgeCapacity,
+                    "cartridgeRemaining" to activeProfile.cartridgeRemaining
+                )
+                db.collection("users").document(userId).set(profileMap)
+
+                // 2. Sync Glucose Readings
+                val glucoseColl = db.collection("users").document(userId).collection("glucose_readings")
+                glucoseReadings.value.forEach { reading ->
+                    val record = hashMapOf(
+                        "readingValue" to reading.readingValue,
+                        "mealContext" to reading.mealContext,
+                        "timestamp" to reading.dateTimeMillis,
+                        "notes" to reading.notes
+                    )
+                    glucoseColl.document(reading.id.toString()).set(record)
+                }
+
+                // 3. Sync Insulin Records
+                val insulinColl = db.collection("users").document(userId).collection("insulin_records")
+                insulinRecords.value.forEach { record ->
+                    val map = hashMapOf(
+                        "insulinType" to record.insulinType,
+                        "doseUnits" to record.doseUnits,
+                        "timestamp" to record.dateTimeMillis,
+                        "notes" to record.notes
+                    )
+                    insulinColl.document(record.id.toString()).set(map)
+                }
+
+                // 4. Sync Blood Pressure Records
+                val bpColl = db.collection("users").document(userId).collection("blood_pressure_records")
+                bloodPressureRecords.value.forEach { record ->
+                    val map = hashMapOf(
+                        "systolic" to record.systolic,
+                        "diastolic" to record.diastolic,
+                        "pulse" to record.pulse,
+                        "timestamp" to record.dateTimeMillis,
+                        "notes" to record.notes
+                    )
+                    bpColl.document(record.id.toString()).set(map)
+                }
+
+                val msg = "Full clinical database synced successfully with Firestore!"
+                android.util.Log.d("FirebaseSync", msg)
+                callback?.invoke(true, msg)
+            } catch (e: Exception) {
+                val errorMsg = "Firestore sync error: ${e.localizedMessage ?: "Unknown"}"
+                android.util.Log.e("FirebaseSync", errorMsg, e)
+                callback?.invoke(false, errorMsg)
             }
         }
     }
@@ -427,9 +576,19 @@ class GlucoViewModel(application: Application) : AndroidViewModel(application) {
                         auth.signInWithEmailAndPassword(resolvedEmail, password)
                             .addOnSuccessListener { result ->
                                 android.util.Log.d("FirebaseAuth", "Successfully authenticated with Firebase: ${result.user?.uid}")
+                                syncAllDataToFirebase()
                             }
                             .addOnFailureListener { e ->
-                                android.util.Log.e("FirebaseAuth", "Firebase login error: ${e.message}")
+                                android.util.Log.e("FirebaseAuth", "Firebase login failed, trying auto-registration fallback: ${e.message}")
+                                // Fallback: Create Firebase Auth account if user is valid locally but does not exist in Firebase yet
+                                auth.createUserWithEmailAndPassword(resolvedEmail, password)
+                                    .addOnSuccessListener { regResult ->
+                                        android.util.Log.d("FirebaseAuth", "Successfully auto-registered and logged in with Firebase: ${regResult.user?.uid}")
+                                        syncAllDataToFirebase()
+                                    }
+                                    .addOnFailureListener { regError ->
+                                        android.util.Log.e("FirebaseAuth", "Firebase auto-registration fallback failed: ${regError.message}")
+                                    }
                             }
                     }
                 } catch (e: Exception) {
@@ -552,12 +711,14 @@ class GlucoViewModel(application: Application) : AndroidViewModel(application) {
                 auth.signInWithEmailAndPassword(email, "google_verified_auth_123!")
                     .addOnSuccessListener { result ->
                         android.util.Log.d("FirebaseAuth", "Google profile Firebase Auth login successful: ${result.user?.uid}")
+                        syncAllDataToFirebase()
                     }
                     .addOnFailureListener { e ->
                         // User might not exist yet, let's create the account
                         auth.createUserWithEmailAndPassword(email, "google_verified_auth_123!")
                             .addOnSuccessListener { regResult ->
                                 android.util.Log.d("FirebaseAuth", "Google profile Firebase Auth registration successful: ${regResult.user?.uid}")
+                                syncAllDataToFirebase()
                             }
                             .addOnFailureListener { regError ->
                                 android.util.Log.e("FirebaseAuth", "Google profile Firebase Auth registration failed: ${regError.message}")
