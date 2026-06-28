@@ -1,33 +1,41 @@
 {
   "project_info": {
-    "project_number": "803116876150",
-    "project_id": "glucolog-e8835",
-    "storage_bucket": "glucolog-e8835.firebasestorage.app"
+    "project_number": "636708234605",
+    "project_id": "glucolog-8b290",
+    "storage_bucket": "glucolog-8b290.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:803116876150:android:42fa29fac71c1c64647a57",
+        "mobilesdk_app_id": "1:636708234605:android:c7228b9e1a5da714f6e664",
         "android_client_info": {
-          "package_name": "com.aistudio.glucolog.qwdrtp"
+          "package_name": "com.glucolog.sunuoy"
         }
       },
       "oauth_client": [
         {
-          "client_id": "803116876150-ipkfispcb8iqmprug3s1ie7rvapsmen6.apps.googleusercontent.com",
+          "client_id": "636708234605-tgbjfov9icughhqbptgrln2brfh2rdbl.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.glucolog.sunuoy",
+            "certificate_hash": "966f5dc23fa720fa4685373b8556b92c674a7556"
+          }
+        },
+        {
+          "client_id": "636708234605-4rmb0214rcip3pcakul3h090lp411mgk.apps.googleusercontent.com",
           "client_type": 3
         }
       ],
       "api_key": [
         {
-          "current_key": "AIzaSyCAkm01JSnkYijqXABVpg_YoQePWGt6do0"
+          "current_key": "AIzaSyBGYUMs6OFaJK2xeiIOcGT2qIaQFYvuPZw"
         }
       ],
       "services": {
         "appinvite_service": {
           "other_platform_oauth_client": [
             {
-              "client_id": "803116876150-ipkfispcb8iqmprug3s1ie7rvapsmen6.apps.googleusercontent.com",
+              "client_id": "636708234605-4rmb0214rcip3pcakul3h090lp411mgk.apps.googleusercontent.com",
               "client_type": 3
             }
           ]

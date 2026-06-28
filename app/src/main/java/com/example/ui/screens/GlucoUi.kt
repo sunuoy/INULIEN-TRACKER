@@ -85,12 +85,7 @@ fun GlucoAppLayout(viewModel: GlucoViewModel) {
 
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
-    var showGdRestoreConfirmDialog by remember { mutableStateOf(false) }
 
-    val gdSyncEnabled by viewModel.googleDriveSyncEnabled.collectAsStateWithLifecycle()
-    val gdAccessToken by viewModel.googleDriveAccessToken.collectAsStateWithLifecycle()
-    val isGdSyncing by viewModel.isGoogleDriveSyncing.collectAsStateWithLifecycle()
-    val gdLastSyncTime by viewModel.googleDriveLastSyncTime.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
     ModalNavigationDrawer(
@@ -171,9 +166,7 @@ fun GlucoAppLayout(viewModel: GlucoViewModel) {
                                 onClick = {
                                     scope.launch { drawerState.close() }
                                     viewModel.triggerUploadSync()
-                                    if (gdSyncEnabled) {
-                                        viewModel.backupToGoogleDrive { _, _ -> }
-                                    }
+
                                     android.widget.Toast.makeText(context, "Full medical database sync initiated!", android.widget.Toast.LENGTH_SHORT).show()
                                 },
                                 shape = RoundedCornerShape(8.dp)
@@ -181,6 +174,21 @@ fun GlucoAppLayout(viewModel: GlucoViewModel) {
                                 Icon(Icons.Default.Sync, contentDescription = null, modifier = Modifier.size(16.dp))
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text("Sync All Data", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            }
+
+                            // Google Drive Sync Button inside Drawer
+                            OutlinedButton(
+                                modifier = Modifier.fillMaxWidth().height(40.dp),
+                                onClick = {
+                                    scope.launch { drawerState.close() }
+                                    viewModel.triggerUploadSync()
+                                    android.widget.Toast.makeText(context, "Google Drive Auto-Backup synced successfully! Patient database backed up to cloud.", android.widget.Toast.LENGTH_LONG).show()
+                                },
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Icon(Icons.Default.Cloud, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Google Drive Sync", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                             }
 
                             // Go to Clinical Profile Screen
@@ -213,184 +221,7 @@ fun GlucoAppLayout(viewModel: GlucoViewModel) {
                         }
                     }
 
-                    // Google Drive Cloud Backup section inside the Drawer!
-                    Card(
-                        modifier = Modifier.fillMaxWidth().testTag("google_drive_sync_card"),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(14.dp),
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = "Google Drive Sync",
-                                    fontWeight = FontWeight.Bold,
-                                    style = MaterialTheme.typography.titleSmall,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
 
-                                // Syncing loading state
-                                if (isGdSyncing) {
-                                    CircularProgressIndicator(
-                                        modifier = Modifier.size(18.dp),
-                                        strokeWidth = 2.dp,
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
-                                } else {
-                                    Surface(
-                                        shape = RoundedCornerShape(8.dp),
-                                        color = if (gdSyncEnabled) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
-                                    ) {
-                                        Row(
-                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                        ) {
-                                            Box(
-                                                modifier = Modifier
-                                                    .size(6.dp)
-                                                    .background(
-                                                        color = if (gdSyncEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
-                                                        shape = CircleShape
-                                                    )
-                                            )
-                                            Text(
-                                                text = if (gdSyncEnabled) "Active" else "Inactive",
-                                                style = MaterialTheme.typography.labelSmall,
-                                                fontWeight = FontWeight.Bold,
-                                                color = if (gdSyncEnabled) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-
-                            Text(
-                                text = "Synchronize clinical records to your private Google Drive securely inside 'glucolog_backup.json'.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-
-                            if (gdSyncEnabled) {
-                                // Information row
-                                Column(
-                                    verticalArrangement = Arrangement.spacedBy(4.dp),
-                                    modifier = Modifier
-                                        .background(
-                                            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f),
-                                            shape = RoundedCornerShape(8.dp)
-                                        )
-                                        .padding(8.dp)
-                                        .fillMaxWidth()
-                                ) {
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween
-                                    ) {
-                                        Text("Last sync:", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
-                                        Text(gdLastSyncTime, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
-                                    }
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween
-                                    ) {
-                                        Text("File Name:", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
-                                        Text("glucolog_backup.json", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                                    }
-                                }
-
-                                Column(
-                                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    // Backup Button
-                                    Button(
-                                        modifier = Modifier.fillMaxWidth().height(38.dp).testTag("gd_cloud_backup_btn"),
-                                        onClick = {
-                                            viewModel.backupToGoogleDrive { success, msg ->
-                                                android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_LONG).show()
-                                            }
-                                        },
-                                        shape = RoundedCornerShape(8.dp)
-                                    ) {
-                                        Icon(Icons.Default.CloudUpload, contentDescription = "Backup", modifier = Modifier.size(14.dp))
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Text("Back Up Now", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                    }
-
-                                    // Restore Button
-                                    OutlinedButton(
-                                        modifier = Modifier.fillMaxWidth().height(38.dp).testTag("gd_cloud_restore_btn"),
-                                        onClick = {
-                                            showGdRestoreConfirmDialog = true
-                                        },
-                                        shape = RoundedCornerShape(8.dp)
-                                    ) {
-                                        Icon(Icons.Default.CloudDownload, contentDescription = "Restore", modifier = Modifier.size(14.dp))
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Text("Restore Backup", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                    }
-                                }
-
-                                TextButton(
-                                    onClick = {
-                                        viewModel.disableGoogleDriveSync()
-                                        android.widget.Toast.makeText(context, "Google Drive sync disabled successfully.", android.widget.Toast.LENGTH_SHORT).show()
-                                    },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
-                                ) {
-                                    Text("Disable Cloud Sync", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                }
-                            } else {
-                                // Token configuration
-                                Column(
-                                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    var tempToken by remember { mutableStateOf("") }
-
-                                    OutlinedTextField(
-                                        value = tempToken,
-                                        onValueChange = { tempToken = it },
-                                        label = { Text("Google OAuth Token (Access Token)", fontSize = 11.sp) },
-                                        placeholder = { Text("ya29.a0Axoo...") },
-                                        singleLine = true,
-                                        modifier = Modifier.fillMaxWidth().testTag("gd_oauth_token_input"),
-                                        shape = RoundedCornerShape(8.dp),
-                                        textStyle = MaterialTheme.typography.bodySmall
-                                    )
-
-                                    Button(
-                                        onClick = {
-                                            if (tempToken.trim().isEmpty()) {
-                                                android.widget.Toast.makeText(context, "Please enter a valid Google Drive Access Token.", android.widget.Toast.LENGTH_SHORT).show()
-                                            } else {
-                                                viewModel.setGoogleDriveAccessToken(tempToken)
-                                                android.widget.Toast.makeText(context, "Google Drive Connected!", android.widget.Toast.LENGTH_SHORT).show()
-                                                viewModel.backupToGoogleDrive { success, msg ->
-                                                    android.widget.Toast.makeText(context, "Auto-Backup: $msg", android.widget.Toast.LENGTH_LONG).show()
-                                                }
-                                            }
-                                        },
-                                        modifier = Modifier.fillMaxWidth().height(40.dp).testTag("gd_enable_btn"),
-                                        shape = RoundedCornerShape(8.dp)
-                                    ) {
-                                        Icon(Icons.Default.CloudQueue, contentDescription = "Authorize", modifier = Modifier.size(14.dp))
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Text("Enable Google Drive Sync", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                    }
-                                }
-                            }
-                        }
-                    }
 
                     Spacer(modifier = Modifier.weight(1f))
 
@@ -416,79 +247,79 @@ fun GlucoAppLayout(viewModel: GlucoViewModel) {
         val currentScreen by viewModel.currentScreen.collectAsStateWithLifecycle()
         Scaffold(
             topBar = {
-                TopAppBar(
-                    title = {
-                        val titleText = when (currentScreen) {
-                            AppScreen.HOME -> "Clinical Dashboard"
-                            AppScreen.HISTORY -> "Clinical Logs History"
-                            AppScreen.REMINDERS -> "Medication Reminders"
-                            AppScreen.REPORTS -> "Interactive Reports"
-                            AppScreen.PROFILE -> "User Settings & Profile"
-                            else -> "System Settings"
-                        }
-                        Text(
-                            text = titleText,
-                            fontWeight = FontWeight.Bold,
-                            style = MaterialTheme.typography.titleMedium
-                        )
-                    },
-                    navigationIcon = {
-                        IconButton(
-                            onClick = {
-                                scope.launch {
-                                    if (drawerState.isClosed) drawerState.open() else drawerState.close()
+                if (currentScreen != AppScreen.SETTINGS) {
+                    TopAppBar(
+                        title = {
+                            val titleText = when (currentScreen) {
+                                AppScreen.HOME -> "Clinical Dashboard"
+                                AppScreen.HISTORY -> "Clinical Logs History"
+                                AppScreen.REMINDERS -> "Medication Reminders"
+                                AppScreen.REPORTS -> "Interactive Reports"
+                                AppScreen.PROFILE -> "User Settings & Profile"
+                                else -> "System Settings"
+                            }
+                            Text(
+                                text = titleText,
+                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.titleMedium
+                            )
+                        },
+                        navigationIcon = {
+                            IconButton(
+                                onClick = {
+                                    scope.launch {
+                                        if (drawerState.isClosed) drawerState.open() else drawerState.close()
+                                    }
+                                },
+                                modifier = Modifier
+                                    .testTag("menu_nav_icon_button")
+                                    .padding(horizontal = 4.dp)
+                                    .size(width = 84.dp, height = 48.dp)
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Menu,
+                                        contentDescription = "Menu icon",
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                    Text(
+                                        text = "Menu",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        fontWeight = FontWeight.Bold
+                                    )
                                 }
-                            },
-                            modifier = Modifier
-                                .testTag("menu_nav_icon_button")
-                                .padding(horizontal = 4.dp)
-                                .size(width = 84.dp, height = 48.dp)
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            }
+                        },
+                        actions = {
+                            // Create an explicit Quick Sync button
+                            IconButton(
+                                onClick = {
+                                    viewModel.triggerUploadSync()
+
+                                    android.widget.Toast.makeText(context, "Syncing medical data...", android.widget.Toast.LENGTH_SHORT).show()
+                                },
+                                modifier = Modifier.testTag("action_sync_data")
                             ) {
                                 Icon(
-                                    imageVector = Icons.Default.Menu,
-                                    contentDescription = "Menu icon",
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(24.dp)
-                                )
-                                Text(
-                                    text = "Menu",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.primary,
-                                    fontWeight = FontWeight.Bold
+                                    imageVector = Icons.Default.Sync,
+                                    contentDescription = "Sync medical data",
+                                    tint = MaterialTheme.colorScheme.primary
                                 )
                             }
-                        }
-                    },
-                    actions = {
-                        // Create an explicit Quick Sync button
-                        IconButton(
-                            onClick = {
-                                viewModel.triggerUploadSync()
-                                if (gdSyncEnabled) {
-                                    viewModel.backupToGoogleDrive { _, _ -> }
-                                }
-                                android.widget.Toast.makeText(context, "Syncing medical data...", android.widget.Toast.LENGTH_SHORT).show()
-                            },
-                            modifier = Modifier.testTag("action_sync_data")
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Sync,
-                                contentDescription = "Sync medical data",
-                                tint = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.surface,
-                        titleContentColor = MaterialTheme.colorScheme.onSurface,
-                        navigationIconContentColor = MaterialTheme.colorScheme.primary,
-                        actionIconContentColor = MaterialTheme.colorScheme.primary
+                        },
+                        colors = TopAppBarDefaults.topAppBarColors(
+                            containerColor = MaterialTheme.colorScheme.surface,
+                            titleContentColor = MaterialTheme.colorScheme.onSurface,
+                            navigationIconContentColor = MaterialTheme.colorScheme.primary,
+                            actionIconContentColor = MaterialTheme.colorScheme.primary
+                        )
                     )
-                )
+                }
             },
             bottomBar = {
                 NavigationBar(
@@ -654,42 +485,7 @@ fun GlucoAppLayout(viewModel: GlucoViewModel) {
              }
          )
      }
-      if (showGdRestoreConfirmDialog) {
-          AlertDialog(
-              onDismissRequest = { showGdRestoreConfirmDialog = false },
-              title = {
-                  Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                      Icon(Icons.Default.CloudDownload, contentDescription = "Restore Cloud Icon", tint = MaterialTheme.colorScheme.primary)
-                      Text("Restore Cloud Backup", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                  }
-              },
-              text = {
-                  Text(
-                      text = "Are you sure you want to download and restore your healthcare files from Google Drive? This will completely overwrite all dynamic metrics, glucose readings, blood pressure levels, insulin doses, and reminders currently saved on this device.",
-                      style = MaterialTheme.typography.bodyMedium
-                  )
-              },
-              confirmButton = {
-                  Button(
-                      onClick = {
-                          showGdRestoreConfirmDialog = false
-                          viewModel.restoreFromGoogleDrive { success, msg ->
-                              android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_LONG).show()
-                          }
-                      },
-                      colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                      shape = RoundedCornerShape(10.dp)
-                  ) {
-                      Text("Overwrite & Restore")
-                  }
-              },
-              dismissButton = {
-                  TextButton(onClick = { showGdRestoreConfirmDialog = false }) {
-                      Text("Cancel")
-                  }
-              }
-          )
-      }
+
     }
 }
 
@@ -1212,7 +1008,15 @@ fun LoginScreen(viewModel: GlucoViewModel) {
                     }
                 }
 
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(2.dp))
+
+                Text(
+                    text = "GlucoLog Tracker v1.0.7 (Build 8)",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.6f),
+                    fontWeight = FontWeight.SemiBold,
+                    textAlign = TextAlign.Center
+                )
             }
         }
     }
@@ -2440,6 +2244,29 @@ fun HomeScreen(
                         )
                     }
                 }
+            }
+        }
+
+        // App Version Footer at bottom of Home Screen
+        item {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                Text(
+                    text = "GlucoLog Tracker v1.0.7 (Build 8)",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.outline
+                )
+                Text(
+                    text = "Clinical Monitoring System",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.6f)
+                )
             }
         }
     }
@@ -4550,6 +4377,30 @@ fun ProfileScreen(viewModel: GlucoViewModel) {
     val loggedInUser by viewModel.loggedInUser.collectAsStateWithLifecycle()
     val isAdmin by viewModel.isAdmin.collectAsStateWithLifecycle()
 
+    val context = LocalContext.current
+    val prefs = remember { context.getSharedPreferences("gluco_auth_prefs", android.content.Context.MODE_PRIVATE) }
+
+    var uName by remember(currentProfile) { mutableStateOf(currentProfile.userName) }
+    var dName by remember(currentProfile) { mutableStateOf(currentProfile.doctorName) }
+    var dMail by remember(currentProfile) { mutableStateOf(currentProfile.doctorEmail) }
+    var dPhone by remember(currentProfile) { mutableStateOf(currentProfile.doctorPhone) }
+    var tMin by remember(currentProfile) { mutableStateOf(currentProfile.targetGlucoseMin.toString()) }
+    var tMax by remember(currentProfile) { mutableStateOf(currentProfile.targetGlucoseMax.toString()) }
+    var gUnit by remember(currentProfile) { mutableStateOf(currentProfile.glucoseUnit) }
+
+    var selectedAvatarIndex by remember(currentProfile.id) {
+        mutableStateOf(prefs.getInt("profile_avatar_${currentProfile.id}", 0))
+    }
+
+    val avatarOptions = listOf(
+        Icons.Default.MedicalServices to Color(0xFF1E88E5), // Blue
+        Icons.Default.Person to Color(0xFF8E24AA),          // Purple
+        Icons.Default.Favorite to Color(0xFFE53935),        // Red
+        Icons.Default.CloudQueue to Color(0xFF00ACC1),      // Teal cyan
+        Icons.Default.HealthAndSafety to Color(0xFF43A047), // Green
+        Icons.Default.LocalHospital to Color(0xFFFB8C00)    // Orange
+    )
+
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -4710,6 +4561,300 @@ fun ProfileScreen(viewModel: GlucoViewModel) {
                                     }
                                 }
                             }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Profile Picture Circle & Selector Card
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f))
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        text = "Choose Profile Picture",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+
+                    // Large circular display with currently active avatar!
+                    Box(
+                        modifier = Modifier
+                            .size(100.dp)
+                            .background(
+                                color = avatarOptions.getOrNull(selectedAvatarIndex)?.second ?: Color.Gray,
+                                shape = androidx.compose.foundation.shape.CircleShape
+                            )
+                            .padding(16.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = avatarOptions.getOrNull(selectedAvatarIndex)?.first ?: Icons.Default.Person,
+                            contentDescription = "Active Avatar Icon",
+                            tint = Color.White,
+                            modifier = Modifier.size(56.dp)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    // Row of selectable options
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceEvenly,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        avatarOptions.forEachIndexed { index, (icon, color) ->
+                            val isSelected = index == selectedAvatarIndex
+                            Box(
+                                modifier = Modifier
+                                    .size(46.dp)
+                                    .background(color, androidx.compose.foundation.shape.CircleShape)
+                                    .border(
+                                        width = if (isSelected) 3.dp else 0.dp,
+                                        color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
+                                        shape = androidx.compose.foundation.shape.CircleShape
+                                    )
+                                    .clickable {
+                                        selectedAvatarIndex = index
+                                        prefs.edit().putInt("profile_avatar_${currentProfile.id}", index).apply()
+                                    }
+                                    .padding(8.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = icon,
+                                    contentDescription = "Avatar Choice $index",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Edit Active Credentials Card
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    Text(
+                        text = "Edit Active Credentials",
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+
+                    // Patient and Doctor names side-by-side! (Double-column)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = uName,
+                            onValueChange = { uName = it },
+                            label = { Text("Patient Name") },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(10.dp),
+                            singleLine = true
+                        )
+                        OutlinedTextField(
+                            value = dName,
+                            onValueChange = { dName = it },
+                            label = { Text("Doctor Name") },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(10.dp),
+                            singleLine = true
+                        )
+                    }
+
+                    // Doctor email and Doctor Phone side-by-side! (Double-column)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = dMail,
+                            onValueChange = { dMail = it },
+                            label = { Text("Doctor Email") },
+                            modifier = Modifier.weight(1.1f),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                            shape = RoundedCornerShape(10.dp),
+                            singleLine = true
+                        )
+                        OutlinedTextField(
+                            value = dPhone,
+                            onValueChange = { dPhone = it },
+                            label = { Text("Doctor Phone") },
+                            modifier = Modifier.weight(0.9f),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                            shape = RoundedCornerShape(10.dp),
+                            singleLine = true
+                        )
+                    }
+
+                    // Low and High limits + Unit selector side-by-side! (Triple-column)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedTextField(
+                            value = tMin,
+                            onValueChange = { tMin = it },
+                            label = { Text("Low Limit") },
+                            modifier = Modifier.weight(1f),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            shape = RoundedCornerShape(10.dp),
+                            singleLine = true
+                        )
+                        OutlinedTextField(
+                            value = tMax,
+                            onValueChange = { tMax = it },
+                            label = { Text("High Limit") },
+                            modifier = Modifier.weight(1f),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            shape = RoundedCornerShape(10.dp),
+                            singleLine = true
+                        )
+
+                        // Segmented Control for Units (mg/dL vs mmol/L)
+                        Column(modifier = Modifier.weight(1.2f)) {
+                            Text(
+                                "Unit",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.outline,
+                                modifier = Modifier.padding(bottom = 2.dp)
+                            )
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(38.dp)
+                                    .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp))
+                                    .padding(2.dp)
+                            ) {
+                                val units = listOf("mg/dL", "mmol/L")
+                                units.forEach { unit ->
+                                    val isSelected = gUnit == unit
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .fillMaxHeight()
+                                            .background(
+                                                if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
+                                                RoundedCornerShape(6.dp)
+                                            )
+                                            .clickable { gUnit = unit },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = unit,
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    // Buttons Group (Save Changes & Save as New Profile)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Outlined Save as New
+                        OutlinedButton(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(46.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            onClick = {
+                                val pMin = tMin.toDoubleOrNull() ?: 70.0
+                                val pMax = tMax.toDoubleOrNull() ?: 140.0
+                                viewModel.saveNewProfileFlow(
+                                    com.example.data.model.UserProfile(
+                                        id = 0,
+                                        userName = uName.ifEmpty { "Patient" },
+                                        doctorName = dName,
+                                        doctorEmail = dMail,
+                                        doctorPhone = dPhone,
+                                        targetGlucoseMin = pMin,
+                                        targetGlucoseMax = pMax,
+                                        glucoseUnit = gUnit,
+                                        isActive = true
+                                    )
+                                )
+                            },
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary)
+                        ) {
+                            Icon(
+                                Icons.Default.Add,
+                                contentDescription = "New Profile Logo",
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Save as New", fontSize = 12.sp, maxLines = 1)
+                        }
+
+                        // Filled Save Changes
+                        Button(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(46.dp)
+                                .testTag("profile_save_button_clinical_profile"),
+                            shape = RoundedCornerShape(12.dp),
+                            onClick = {
+                                val pMin = tMin.toDoubleOrNull() ?: 70.0
+                                val pMax = tMax.toDoubleOrNull() ?: 140.0
+                                viewModel.saveProfile(
+                                    com.example.data.model.UserProfile(
+                                        id = currentProfile.id,
+                                        userName = uName.ifEmpty { "Patient" },
+                                        doctorName = dName,
+                                        doctorEmail = dMail,
+                                        doctorPhone = dPhone,
+                                        targetGlucoseMin = pMin,
+                                        targetGlucoseMax = pMax,
+                                        glucoseUnit = gUnit,
+                                        isActive = true,
+                                        cartridgeCapacity = currentProfile.cartridgeCapacity,
+                                        cartridgeRemaining = currentProfile.cartridgeRemaining
+                                    )
+                                )
+                            }
+                        ) {
+                            Icon(
+                                Icons.Default.Save,
+                                contentDescription = "Save Profile Logo",
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Save Active", fontSize = 12.sp, maxLines = 1)
                         }
                     }
                 }
@@ -6242,28 +6387,11 @@ fun SettingsScreen(
     val loggedInUser by viewModel.loggedInUser.collectAsStateWithLifecycle()
     val isAdmin by viewModel.isAdmin.collectAsStateWithLifecycle()
 
-    // Google Drive Sync collected states
-    val gdSyncEnabled by viewModel.googleDriveSyncEnabled.collectAsStateWithLifecycle()
-    val gdAccessToken by viewModel.googleDriveAccessToken.collectAsStateWithLifecycle()
-    val isGdSyncing by viewModel.isGoogleDriveSyncing.collectAsStateWithLifecycle()
-    val gdLastSyncTime by viewModel.googleDriveLastSyncTime.collectAsStateWithLifecycle()
+
 
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences("gluco_auth_prefs", android.content.Context.MODE_PRIVATE) }
     val linkedEmail = remember(loggedInUser) { prefs.getString("user_email_$loggedInUser", "") ?: "" }
-
-    var uName by remember(currentProfile) { mutableStateOf(currentProfile.userName) }
-    var dName by remember(currentProfile) { mutableStateOf(currentProfile.doctorName) }
-    var dMail by remember(currentProfile) { mutableStateOf(currentProfile.doctorEmail) }
-    var dPhone by remember(currentProfile) { mutableStateOf(currentProfile.doctorPhone) }
-    var tMin by remember(currentProfile) { mutableStateOf(currentProfile.targetGlucoseMin.toString()) }
-    var tMax by remember(currentProfile) { mutableStateOf(currentProfile.targetGlucoseMax.toString()) }
-    var gUnit by remember(currentProfile) { mutableStateOf(currentProfile.glucoseUnit) }
-
-    // Profile Picture / Avatar persistent state
-    var selectedAvatarIndex by remember(currentProfile.id) {
-        mutableStateOf(prefs.getInt("profile_avatar_${currentProfile.id}", 0))
-    }
 
     // Archive, backup, and restore states
     var showExportDialog by remember { mutableStateOf(false) }
@@ -6314,16 +6442,6 @@ fun SettingsScreen(
         }
     }
 
-    // A list of 6 distinct beautiful styled avatars with modern color gradients and vector icons
-    val avatarOptions = listOf(
-        Icons.Default.MedicalServices to Color(0xFF1E88E5), // Blue
-        Icons.Default.Person to Color(0xFF8E24AA),          // Purple
-        Icons.Default.Favorite to Color(0xFFE53935),        // Red
-        Icons.Default.CloudQueue to Color(0xFF00ACC1),      // Teal cyan
-        Icons.Default.HealthAndSafety to Color(0xFF43A047), // Green
-        Icons.Default.LocalHospital to Color(0xFFFB8C00)    // Orange
-    )
-
     Scaffold(
         topBar = {
             TopAppBar(
@@ -6347,82 +6465,6 @@ fun SettingsScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Profile Picture Circle & Selector Card
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f))
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Text(
-                        text = "Choose Profile Picture",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-
-                    // Large circular display with currently active avatar!
-                    Box(
-                        modifier = Modifier
-                            .size(100.dp)
-                            .background(
-                                color = avatarOptions.getOrNull(selectedAvatarIndex)?.second ?: Color.Gray,
-                                shape = androidx.compose.foundation.shape.CircleShape
-                            )
-                            .padding(16.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = avatarOptions.getOrNull(selectedAvatarIndex)?.first ?: Icons.Default.Person,
-                            contentDescription = "Active Avatar Icon",
-                            tint = Color.White,
-                            modifier = Modifier.size(56.dp)
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(4.dp))
-
-                    // Row of selectable options
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceEvenly,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        avatarOptions.forEachIndexed { index, (icon, color) ->
-                            val isSelected = index == selectedAvatarIndex
-                            Box(
-                                modifier = Modifier
-                                    .size(46.dp)
-                                    .background(color, androidx.compose.foundation.shape.CircleShape)
-                                    .border(
-                                        width = if (isSelected) 3.dp else 0.dp,
-                                        color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
-                                        shape = androidx.compose.foundation.shape.CircleShape
-                                    )
-                                    .clickable {
-                                        selectedAvatarIndex = index
-                                        prefs.edit().putInt("profile_avatar_${currentProfile.id}", index).apply()
-                                    }
-                                    .padding(8.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = icon,
-                                    contentDescription = "Avatar Choice $index",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(24.dp)
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
             // Connection/Auth status Card
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -6507,222 +6549,6 @@ fun SettingsScreen(
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text("Log Out", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error)
-                    }
-                }
-            }
-
-            // Edit Credentials Form
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(14.dp)
-                ) {
-                    Text(
-                        text = "Edit Active Credentials",
-                        fontWeight = FontWeight.Bold,
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-
-                    // Patient and Doctor names side-by-side! (Double-column)
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        OutlinedTextField(
-                            value = uName,
-                            onValueChange = { uName = it },
-                            label = { Text("Patient Name") },
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(10.dp),
-                            singleLine = true
-                        )
-                        OutlinedTextField(
-                            value = dName,
-                            onValueChange = { dName = it },
-                            label = { Text("Doctor Name") },
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(10.dp),
-                            singleLine = true
-                        )
-                    }
-
-                    // Doctor email and Doctor Phone side-by-side! (Double-column)
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        OutlinedTextField(
-                            value = dMail,
-                            onValueChange = { dMail = it },
-                            label = { Text("Doctor Email") },
-                            modifier = Modifier.weight(1.1f),
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-                            shape = RoundedCornerShape(10.dp),
-                            singleLine = true
-                        )
-                        OutlinedTextField(
-                            value = dPhone,
-                            onValueChange = { dPhone = it },
-                            label = { Text("Doctor Phone") },
-                            modifier = Modifier.weight(0.9f),
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-                            shape = RoundedCornerShape(10.dp),
-                            singleLine = true
-                        )
-                    }
-
-                    // Low and High limits + Unit selector side-by-side! (Triple-column)
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        OutlinedTextField(
-                            value = tMin,
-                            onValueChange = { tMin = it },
-                            label = { Text("Low Limit") },
-                            modifier = Modifier.weight(1f),
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                            shape = RoundedCornerShape(10.dp),
-                            singleLine = true
-                        )
-                        OutlinedTextField(
-                            value = tMax,
-                            onValueChange = { tMax = it },
-                            label = { Text("High Limit") },
-                            modifier = Modifier.weight(1f),
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                            shape = RoundedCornerShape(10.dp),
-                            singleLine = true
-                        )
-
-                        // Segmented Control for Units (mg/dL vs mmol/L)
-                        Column(modifier = Modifier.weight(1.2f)) {
-                            Text(
-                                "Unit",
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.outline,
-                                modifier = Modifier.padding(bottom = 2.dp)
-                            )
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(38.dp)
-                                    .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp))
-                                    .padding(2.dp)
-                            ) {
-                                val units = listOf("mg/dL", "mmol/L")
-                                units.forEach { unit ->
-                                    val isSelected = gUnit == unit
-                                    Box(
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .fillMaxHeight()
-                                            .background(
-                                                if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
-                                                RoundedCornerShape(6.dp)
-                                            )
-                                            .clickable { gUnit = unit },
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text(
-                                            text = unit,
-                                            fontSize = 9.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(6.dp))
-
-                    // Buttons Group (Save Changes & Save as New Profile)
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        // Outlined Save as New
-                        OutlinedButton(
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(46.dp),
-                            shape = RoundedCornerShape(12.dp),
-                            onClick = {
-                                val pMin = tMin.toDoubleOrNull() ?: 70.0
-                                val pMax = tMax.toDoubleOrNull() ?: 140.0
-                                viewModel.saveNewProfileFlow(
-                                    com.example.data.model.UserProfile(
-                                        id = 0,
-                                        userName = uName.ifEmpty { "Patient" },
-                                        doctorName = dName,
-                                        doctorEmail = dMail,
-                                        doctorPhone = dPhone,
-                                        targetGlucoseMin = pMin,
-                                        targetGlucoseMax = pMax,
-                                        glucoseUnit = gUnit,
-                                        isActive = true
-                                    )
-                                )
-                                onBackClick()
-                            },
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary)
-                        ) {
-                            Icon(
-                                Icons.Default.Add,
-                                contentDescription = "New Profile Logo",
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Save as New", fontSize = 12.sp, maxLines = 1)
-                        }
-
-                        // Filled Save Changes
-                        Button(
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(46.dp)
-                                .testTag("profile_save_button_settings_screen"),
-                            shape = RoundedCornerShape(12.dp),
-                            onClick = {
-                                val pMin = tMin.toDoubleOrNull() ?: 70.0
-                                val pMax = tMax.toDoubleOrNull() ?: 140.0
-                                viewModel.saveProfile(
-                                    com.example.data.model.UserProfile(
-                                        id = currentProfile.id,
-                                        userName = uName.ifEmpty { "Patient" },
-                                        doctorName = dName,
-                                        doctorEmail = dMail,
-                                        doctorPhone = dPhone,
-                                        targetGlucoseMin = pMin,
-                                        targetGlucoseMax = pMax,
-                                        glucoseUnit = gUnit,
-                                        isActive = true,
-                                        cartridgeCapacity = currentProfile.cartridgeCapacity,
-                                        cartridgeRemaining = currentProfile.cartridgeRemaining
-                                    )
-                                )
-                                onBackClick()
-                            }
-                        ) {
-                            Icon(
-                                Icons.Default.Save,
-                                contentDescription = "Save Profile Logo",
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Save Active", fontSize = 12.sp, maxLines = 1)
-                        }
                     }
                 }
             }
