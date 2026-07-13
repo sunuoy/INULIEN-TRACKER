@@ -69,7 +69,7 @@ object GoogleDriveService {
     private fun createNewBackupFile(accessToken: String, jsonData: String): Boolean {
         // Multi-part or simple upload. Simple metadata-content upload using multipart approach:
         // Or simple: POST to upload URL with query parameters.
-        val boundary = "==BackupBoundary=="
+        val boundary = "BackupBoundaryXYZ"
         val mediaType = "multipart/related; boundary=$boundary".toMediaType()
 
         val metadata = JSONObject()
