@@ -6811,94 +6811,38 @@ fun SettingsScreen(
                     }
 
                     Text(
-                        text = "Synchronize your clinical database directly with your personal Google Drive storage. Input an OAuth2 access token to authenticate.",
+                        text = "Synchronize your clinical database directly with your personal Google Drive storage automatically in the background.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
 
-                    var tokenInput by remember { mutableStateOf(gdAccessToken) }
-                    var tokenVisible by remember { mutableStateOf(false) }
-
-                    LaunchedEffect(gdAccessToken) {
-                        tokenInput = gdAccessToken
-                    }
-
-                    // Authorize Automatically Button
-                    Button(
-                        onClick = {
-                            try {
-                                val intent = android.accounts.AccountManager.newChooseAccountIntent(
-                                    null,
-                                    null,
-                                    arrayOf("com.google"),
-                                    null,
-                                    null,
-                                    null,
-                                    null
-                                )
-                                googleAccountPickerLauncherForDrive.launch(intent)
-                            } catch (e: Exception) {
-                                android.widget.Toast.makeText(context, "Failed to launch account chooser: ${e.message}", android.widget.Toast.LENGTH_LONG).show()
-                            }
-                        },
-                        modifier = Modifier.fillMaxWidth().testTag("gd_auth_auto_button"),
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Icon(Icons.Default.AccountCircle, contentDescription = "Authorize Automatically", modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Authorize Google Drive Automatically")
-                    }
-
-                    Text(
-                        text = "Or input Google Drive Access Token manually:",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.outline,
-                        fontWeight = FontWeight.Bold
-                    )
-
-                    OutlinedTextField(
-                        value = tokenInput,
-                        onValueChange = {
-                            tokenInput = it
-                            viewModel.setGoogleDriveAccessToken(it)
-                        },
-                        label = { Text("Google Drive Access Token") },
-                        placeholder = { Text("ya29.a0AfH6SMA...") },
-                        singleLine = true,
-                        visualTransformation = if (tokenVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                        trailingIcon = {
-                            IconButton(onClick = { tokenVisible = !tokenVisible }) {
-                                Icon(
-                                    imageVector = if (tokenVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
-                                    contentDescription = "Toggle Token Visibility"
-                                )
-                            }
-                        },
-                        modifier = Modifier.fillMaxWidth().testTag("gd_access_token_input"),
-                        shape = RoundedCornerShape(12.dp)
-                    )
-
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "Last Synced: $gdLastSyncTime",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.outline
+                            text = "Status: ${if (gdAccessToken.isNotEmpty()) "Connected (Auto-backup Active)" else "Disconnected"}",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = if (gdAccessToken.isNotEmpty()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
                         )
 
                         if (gdAccessToken.isNotEmpty()) {
                             TextButton(
-                                onClick = { viewModel.disableGoogleDriveSync(); tokenInput = "" },
+                                onClick = { viewModel.disableGoogleDriveSync() },
                                 colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
                             ) {
                                 Text("Disconnect")
                             }
                         }
                     }
+
+                    Text(
+                        text = "Last Synced: $gdLastSyncTime",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.outline
+                    )
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
