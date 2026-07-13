@@ -149,4 +149,8 @@ class AppRepository(
     suspend fun clearAllProfiles() {
         profileDao.clearAllProfiles()
     }
+
+    suspend fun getAnyReminderSync(): Reminder? {
+        return reminderDao.getAnyReminderSync()
+    }
 }

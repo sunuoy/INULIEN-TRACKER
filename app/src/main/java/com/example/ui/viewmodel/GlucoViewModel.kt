@@ -1068,17 +1068,16 @@ class GlucoViewModel(application: Application) : AndroidViewModel(application) {
             }
 
             // Reminders Prepopulation
-            repository.allReminders.first().let { currentReminders ->
-                if (currentReminders.isEmpty()) {
-                    val defaultRems = listOf(
-                        Reminder(reminderType = "Insulin", label = "Morning Rapid Dose", hour = 8, minute = 0),
-                        Reminder(reminderType = "Insulin", label = "Lunch Time Dose", hour = 12, minute = 30),
-                        Reminder(reminderType = "Insulin", label = "Evening Long-acting Dose", hour = 21, minute = 0),
-                        Reminder(reminderType = "Blood Sugar Check", label = "Fasting Glucose Check", hour = 7, minute = 0),
-                        Reminder(reminderType = "Blood Sugar Check", label = "Bedtime Glucose Check", hour = 22, minute = 0)
-                    )
-                    defaultRems.forEach { repository.insertReminder(it) }
-                }
+            val anyRem = repository.getAnyReminderSync()
+            if (anyRem == null) {
+                val defaultRems = listOf(
+                    Reminder(reminderType = "Insulin", label = "Morning Rapid Dose", hour = 8, minute = 0),
+                    Reminder(reminderType = "Insulin", label = "Lunch Time Dose", hour = 12, minute = 30),
+                    Reminder(reminderType = "Insulin", label = "Evening Long-acting Dose", hour = 21, minute = 0),
+                    Reminder(reminderType = "Blood Sugar Check", label = "Fasting Glucose Check", hour = 7, minute = 0),
+                    Reminder(reminderType = "Blood Sugar Check", label = "Bedtime Glucose Check", hour = 22, minute = 0)
+                )
+                defaultRems.forEach { repository.insertReminder(it) }
             }
         }
     }
