@@ -46,7 +46,8 @@ object GoogleDriveService {
         try {
             client.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) {
-                    Log.e("GoogleDriveService", "Find backup call unsuccessful: ${response.code} ${response.message}")
+                    val body = response.body?.string() ?: ""
+                    Log.e("GoogleDriveService", "Find backup call unsuccessful: ${response.code} ${response.message} - Body: $body")
                     return null
                 }
                 val bodyStr = response.body?.string() ?: return null
@@ -108,7 +109,8 @@ object GoogleDriveService {
                     Log.d("GoogleDriveService", "Successfully created new glucolog_backup.json on Google Drive")
                     return true
                 } else {
-                    Log.e("GoogleDriveService", "Failed to create new file: ${response.code} ${response.message}")
+                    val body = response.body?.string() ?: ""
+                    Log.e("GoogleDriveService", "Failed to create new file: ${response.code} ${response.message} - Body: $body")
                 }
             }
         } catch (e: Exception) {
@@ -132,7 +134,8 @@ object GoogleDriveService {
                     Log.d("GoogleDriveService", "Successfully updated glucolog_backup.json with ID $fileId on Google Drive")
                     return true
                 } else {
-                    Log.e("GoogleDriveService", "Failed to update backup file: ${response.code} ${response.message}")
+                    val body = response.body?.string() ?: ""
+                    Log.e("GoogleDriveService", "Failed to update backup file: ${response.code} ${response.message} - Body: $body")
                 }
             }
         } catch (e: Exception) {
@@ -158,7 +161,8 @@ object GoogleDriveService {
                     Log.d("GoogleDriveService", "Successfully downloaded file content")
                     return response.body?.string()
                 } else {
-                    Log.e("GoogleDriveService", "Failed to download backup file: ${response.code} ${response.message}")
+                    val body = response.body?.string() ?: ""
+                    Log.e("GoogleDriveService", "Failed to download backup file: ${response.code} ${response.message} - Body: $body")
                 }
             }
         } catch (e: Exception) {
