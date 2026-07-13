@@ -1000,6 +1000,28 @@ class GlucoViewModel(application: Application) : AndroidViewModel(application) {
 
         // Auto-run update check on app launch
         checkForAppUpdates()
+
+        // Auto-run Google Drive background sync when data changes and token is configured
+        viewModelScope.launch {
+            combine(
+                repository.allGlucoseReadings,
+                repository.allInsulinRecords,
+                repository.allBloodPressureRecords,
+                repository.allReminders,
+                repository.allRefillLogs,
+                _googleDriveAccessToken
+            ) { array: Array<Any?> ->
+                array[5] as String
+            }
+            .debounce(3000) // 3-second debounce to avoid spamming the API on batch updates
+            .collect { token ->
+                if (token.isNotEmpty()) {
+                    backupToGoogleDrive { success, msg ->
+                        android.util.Log.d("GoogleDriveAutoSync", "Background auto-backup: $msg")
+                    }
+                }
+            }
+        }
     }
 
     private fun defaultProfile() = UserProfile(
