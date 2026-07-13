@@ -21,6 +21,16 @@ object GoogleDriveService {
     private const val DRIVE_FILES_URL = "https://www.googleapis.com/drive/v3/files"
     private const val DRIVE_UPLOAD_URL = "https://www.googleapis.com/upload/drive/v3/files"
 
+    fun invalidateToken(context: Context, token: String) {
+        try {
+            val accountManager = android.accounts.AccountManager.get(context)
+            accountManager.invalidateAuthToken("com.google", token)
+            Log.d("GoogleDriveService", "Successfully invalidated cached auth token")
+        } catch (e: Exception) {
+            Log.e("GoogleDriveService", "Error invalidating token: ${e.message}")
+        }
+    }
+
     /**
      * Searches for a file named "glucolog_backup.json" in the user's Google Drive.
      * Returns the file ID if found, otherwise null.

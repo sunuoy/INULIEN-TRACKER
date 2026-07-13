@@ -2595,6 +2595,7 @@ class GlucoViewModel(application: Application) : AndroidViewModel(application) {
                                         .edit().putString("gd_last_sync_time", nowStr).apply()
                                     onComplete(true, "Successfully backed up clinical data to Google Drive!")
                                 } else {
+                                    com.example.data.api.GoogleDriveService.invalidateToken(getApplication(), token)
                                     onComplete(false, "Drive upload failed. Please check access token scope or expiry.")
                                 }
                             }
