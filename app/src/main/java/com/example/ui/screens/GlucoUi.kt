@@ -177,12 +177,19 @@ fun GlucoAppLayout(viewModel: GlucoViewModel) {
                             }
 
                             // Google Drive Sync Button inside Drawer
+                            val gdAccessTokenForDrawer by viewModel.googleDriveAccessToken.collectAsStateWithLifecycle()
                             OutlinedButton(
                                 modifier = Modifier.fillMaxWidth().height(40.dp),
                                 onClick = {
                                     scope.launch { drawerState.close() }
-                                    viewModel.triggerUploadSync()
-                                    android.widget.Toast.makeText(context, "Google Drive Auto-Backup synced successfully! Patient database backed up to cloud.", android.widget.Toast.LENGTH_LONG).show()
+                                    if (gdAccessTokenForDrawer.isEmpty()) {
+                                        android.widget.Toast.makeText(context, "Google Drive not configured. Please go to Settings and enter your Access Token.", android.widget.Toast.LENGTH_LONG).show()
+                                    } else {
+                                        android.widget.Toast.makeText(context, "Initiating Google Drive backup...", android.widget.Toast.LENGTH_SHORT).show()
+                                        viewModel.backupToGoogleDrive { success, msg ->
+                                            android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_LONG).show()
+                                        }
+                                    }
                                 },
                                 shape = RoundedCornerShape(8.dp)
                             ) {
@@ -6726,6 +6733,141 @@ fun SettingsScreen(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text("Clear All App Data", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+
+            // Google Drive Cloud Backup Card
+            val gdSyncEnabled by viewModel.googleDriveSyncEnabled.collectAsStateWithLifecycle()
+            val gdAccessToken by viewModel.googleDriveAccessToken.collectAsStateWithLifecycle()
+            val gdLastSyncTime by viewModel.googleDriveLastSyncTime.collectAsStateWithLifecycle()
+            val gdSyncing by viewModel.isGoogleDriveSyncing.collectAsStateWithLifecycle()
+
+            Card(
+                modifier = Modifier.fillMaxWidth().testTag("google_drive_sync_card"),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Icon(
+                                imageVector = Icons.Default.Cloud,
+                                contentDescription = "Google Drive Sync",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                            Text(
+                                text = "Google Drive Cloud Backup",
+                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
+
+                    Text(
+                        text = "Synchronize your clinical database directly with your personal Google Drive storage. Input an OAuth2 access token to authenticate.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    var tokenInput by remember { mutableStateOf(gdAccessToken) }
+                    var tokenVisible by remember { mutableStateOf(false) }
+
+                    OutlinedTextField(
+                        value = tokenInput,
+                        onValueChange = {
+                            tokenInput = it
+                            viewModel.setGoogleDriveAccessToken(it)
+                        },
+                        label = { Text("Google Drive Access Token") },
+                        placeholder = { Text("ya29.a0AfH6SMA...") },
+                        singleLine = true,
+                        visualTransformation = if (tokenVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                        trailingIcon = {
+                            IconButton(onClick = { tokenVisible = !tokenVisible }) {
+                                Icon(
+                                    imageVector = if (tokenVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                                    contentDescription = "Toggle Token Visibility"
+                                )
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth().testTag("gd_access_token_input"),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Last Synced: $gdLastSyncTime",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.outline
+                        )
+
+                        if (gdAccessToken.isNotEmpty()) {
+                            TextButton(
+                                onClick = { viewModel.disableGoogleDriveSync(); tokenInput = "" },
+                                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                            ) {
+                                Text("Disconnect")
+                            }
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        // Backup now button
+                        Button(
+                            modifier = Modifier.weight(1f).height(46.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            enabled = !gdSyncing && gdAccessToken.isNotEmpty(),
+                            onClick = {
+                                viewModel.backupToGoogleDrive { success, msg ->
+                                    android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_LONG).show()
+                                }
+                            }
+                        ) {
+                            if (gdSyncing) {
+                                CircularProgressIndicator(modifier = Modifier.size(18.dp), color = MaterialTheme.colorScheme.onPrimary, strokeWidth = 2.dp)
+                            } else {
+                                Icon(Icons.Default.CloudUpload, contentDescription = "Backup to Drive", modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Backup Now", fontSize = 12.sp)
+                            }
+                        }
+
+                        // Restore now button
+                        OutlinedButton(
+                            modifier = Modifier.weight(1f).height(46.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            enabled = !gdSyncing && gdAccessToken.isNotEmpty(),
+                            onClick = {
+                                viewModel.restoreFromGoogleDrive { success, msg ->
+                                    android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_LONG).show()
+                                }
+                            }
+                        ) {
+                            if (gdSyncing) {
+                                CircularProgressIndicator(modifier = Modifier.size(18.dp), color = MaterialTheme.colorScheme.primary, strokeWidth = 2.dp)
+                            } else {
+                                Icon(Icons.Default.CloudDownload, contentDescription = "Restore from Drive", modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Restore Now", fontSize = 12.sp)
+                            }
+                        }
                     }
                 }
             }
