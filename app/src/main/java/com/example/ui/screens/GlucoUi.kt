@@ -67,6 +67,12 @@ import java.util.*
 @Composable
 fun GlucoAppLayout(viewModel: GlucoViewModel) {
     val isLoggedIn by viewModel.isLoggedIn.collectAsStateWithLifecycle()
+    val isUpdateAvailable by viewModel.isUpdateAvailable.collectAsStateWithLifecycle()
+    val latestVersion by viewModel.latestReleaseVersion.collectAsStateWithLifecycle()
+    val changeCategory by viewModel.updateChangeCategory.collectAsStateWithLifecycle()
+    val latestApkUrl by viewModel.latestReleaseApkUrl.collectAsStateWithLifecycle()
+    val releaseNotes by viewModel.latestReleaseNotes.collectAsStateWithLifecycle()
+    val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
 
     if (!isLoggedIn) {
         LoginScreen(viewModel = viewModel)
@@ -437,6 +443,88 @@ fun GlucoAppLayout(viewModel: GlucoViewModel) {
                 }
             }
         }
+    }
+
+    if (isLoggedIn && isUpdateAvailable && latestVersion != null) {
+        AlertDialog(
+            onDismissRequest = { viewModel.dismissUpdateDialog() },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.Info,
+                        contentDescription = "Update Available",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "New Update Available!",
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = "A newer version of GlucoLog Tracker is available.",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+
+                    Surface(
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(10.dp)) {
+                            Text(
+                                text = "Latest Release: $latestVersion",
+                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                            Text(
+                                text = changeCategory,
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    }
+
+                    if (!releaseNotes.isNullOrEmpty()) {
+                        Text(
+                            text = "What's New:",
+                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.padding(top = 4.dp)
+                        )
+                        Text(
+                            text = releaseNotes!!,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        latestApkUrl?.let { uriHandler.openUri(it) }
+                        viewModel.dismissUpdateDialog()
+                    },
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text("Update Now")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { viewModel.dismissUpdateDialog() }
+                ) {
+                    Text("Later")
+                }
+            },
+            shape = RoundedCornerShape(16.dp)
+        )
     }
 
     // Modal Forms

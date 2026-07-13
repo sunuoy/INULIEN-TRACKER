@@ -57,6 +57,12 @@ class GlucoViewModel(application: Application) : AndroidViewModel(application) {
     private val _latestReleaseNotes = MutableStateFlow<String?>(null)
     val latestReleaseNotes: StateFlow<String?> = _latestReleaseNotes.asStateFlow()
 
+    private val _isUpdateAvailable = MutableStateFlow(false)
+    val isUpdateAvailable: StateFlow<Boolean> = _isUpdateAvailable.asStateFlow()
+
+    private val _updateChangeCategory = MutableStateFlow("")
+    val updateChangeCategory: StateFlow<String> = _updateChangeCategory.asStateFlow()
+
     // Google Drive Sync states
     private val _googleDriveSyncEnabled = MutableStateFlow(false)
     val googleDriveSyncEnabled: StateFlow<Boolean> = _googleDriveSyncEnabled.asStateFlow()
@@ -910,8 +916,11 @@ class GlucoViewModel(application: Application) : AndroidViewModel(application) {
                                 else -> "Update available"
                             }
                             _updateCheckStatus.value = "$updateType: $tagName"
+                            _isUpdateAvailable.value = true
+                            _updateChangeCategory.value = updateType
                         } else {
                             _updateCheckStatus.value = "App is up to date"
+                            _isUpdateAvailable.value = false
                         }
                     }
                 } else if (connection.responseCode == 404) {
@@ -929,6 +938,10 @@ class GlucoViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
         }
+    }
+
+    fun dismissUpdateDialog() {
+        _isUpdateAvailable.value = false
     }
 
     fun clearLoginError() {
