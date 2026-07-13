@@ -531,7 +531,6 @@ fun LoginScreen(viewModel: GlucoViewModel) {
     }
 
     if (showForgotPasswordDialog) {
-        var resetUsername by remember { mutableStateOf("") }
         var resetEmail by remember { mutableStateOf("") }
 
         AlertDialog(
@@ -555,21 +554,6 @@ fun LoginScreen(viewModel: GlucoViewModel) {
                         text = "Enter your registered email ID to receive a secure Firebase password reset link:",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-
-                    OutlinedTextField(
-                        value = resetUsername,
-                        onValueChange = { 
-                            resetUsername = it 
-                            viewModel.clearLoginError()
-                        },
-                        label = { Text("Username") },
-                        placeholder = { Text("Enter your username") },
-                        singleLine = true,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("reset_username_input"),
-                        shape = RoundedCornerShape(10.dp)
                     )
 
                     OutlinedTextField(
