@@ -533,10 +533,6 @@ fun LoginScreen(viewModel: GlucoViewModel) {
     if (showForgotPasswordDialog) {
         var resetUsername by remember { mutableStateOf("") }
         var resetEmail by remember { mutableStateOf("") }
-        var resetNewPassword by remember { mutableStateOf("") }
-        var resetConfirmPassword by remember { mutableStateOf("") }
-        var resetNewPasswordVisible by remember { mutableStateOf(false) }
-        var resetConfirmPasswordVisible by remember { mutableStateOf(false) }
 
         AlertDialog(
             onDismissRequest = { 
@@ -556,7 +552,7 @@ fun LoginScreen(viewModel: GlucoViewModel) {
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
-                        text = "Verify your registered identity parameters to authorize credential modification:",
+                        text = "Enter your registered email ID to receive a secure Firebase password reset link:",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -592,87 +588,6 @@ fun LoginScreen(viewModel: GlucoViewModel) {
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
                     )
 
-                    Button(
-                        onClick = {
-                            val trimmedEmail = resetEmail.trim()
-                            if (trimmedEmail.isEmpty()) {
-                                viewModel.setLoginError("Please enter your email ID to receive a reset link.")
-                            } else {
-                                try {
-                                    val auth = com.google.firebase.auth.FirebaseAuth.getInstance()
-                                    auth.sendPasswordResetEmail(trimmedEmail)
-                                        .addOnCompleteListener { task ->
-                                            if (task.isSuccessful) {
-                                                android.widget.Toast.makeText(context, "Reset link has been transmitted to $trimmedEmail!", android.widget.Toast.LENGTH_LONG).show()
-                                                showForgotPasswordDialog = false
-                                            } else {
-                                                viewModel.setLoginError("Error: " + (task.exception?.localizedMessage ?: "Failed to send reset link"))
-                                            }
-                                        }
-                                } catch (e: Exception) {
-                                    viewModel.setLoginError("Firebase not initialized: ${e.message}")
-                                }
-                            }
-                        },
-                        modifier = Modifier.fillMaxWidth().testTag("send_email_reset_link_btn"),
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
-                        shape = RoundedCornerShape(10.dp)
-                    ) {
-                        Icon(Icons.Default.Email, contentDescription = "Send Link", modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Send Reset Link to Email")
-                    }
-
-                    OutlinedTextField(
-                        value = resetNewPassword,
-                        onValueChange = { 
-                            resetNewPassword = it 
-                            viewModel.clearLoginError()
-                        },
-                        label = { Text("New Password") },
-                        placeholder = { Text("Enter new password") },
-                        singleLine = true,
-                        visualTransformation = if (resetNewPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                        trailingIcon = {
-                            IconButton(onClick = { resetNewPasswordVisible = !resetNewPasswordVisible }) {
-                                Icon(
-                                    imageVector = if (resetNewPasswordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
-                                    contentDescription = "Toggle password visibility"
-                                )
-                            }
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("reset_password_input"),
-                        shape = RoundedCornerShape(10.dp),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password)
-                    )
-
-                    OutlinedTextField(
-                        value = resetConfirmPassword,
-                        onValueChange = { 
-                            resetConfirmPassword = it 
-                            viewModel.clearLoginError()
-                        },
-                        label = { Text("Confirm New Password") },
-                        placeholder = { Text("Repeat new password") },
-                        singleLine = true,
-                        visualTransformation = if (resetConfirmPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                        trailingIcon = {
-                            IconButton(onClick = { resetConfirmPasswordVisible = !resetConfirmPasswordVisible }) {
-                                Icon(
-                                    imageVector = if (resetConfirmPasswordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
-                                    contentDescription = "Toggle password visibility"
-                                )
-                            }
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("reset_confirm_password_input"),
-                        shape = RoundedCornerShape(10.dp),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password)
-                    )
-
                     if (loginError != null) {
                         Card(
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.4f)),
@@ -703,19 +618,29 @@ fun LoginScreen(viewModel: GlucoViewModel) {
             confirmButton = {
                 Button(
                     onClick = {
-                        if (resetNewPassword != resetConfirmPassword) {
-                            viewModel.setLoginError("New passwords do not match!")
+                        val trimmedEmail = resetEmail.trim()
+                        if (trimmedEmail.isEmpty()) {
+                            viewModel.setLoginError("Please enter your email ID to receive a reset link.")
                         } else {
-                            val success = viewModel.resetPassword(resetUsername, resetEmail, resetNewPassword)
-                            if (success) {
-                                android.widget.Toast.makeText(context, "Password reset successfully! You can now log in.", android.widget.Toast.LENGTH_LONG).show()
-                                showForgotPasswordDialog = false
+                            try {
+                                val auth = com.google.firebase.auth.FirebaseAuth.getInstance()
+                                auth.sendPasswordResetEmail(trimmedEmail)
+                                    .addOnCompleteListener { task ->
+                                        if (task.isSuccessful) {
+                                            android.widget.Toast.makeText(context, "Reset link has been transmitted to $trimmedEmail!", android.widget.Toast.LENGTH_LONG).show()
+                                            showForgotPasswordDialog = false
+                                        } else {
+                                            viewModel.setLoginError("Error: " + (task.exception?.localizedMessage ?: "Failed to send reset link"))
+                                        }
+                                    }
+                            } catch (e: Exception) {
+                                viewModel.setLoginError("Firebase not initialized: ${e.message}")
                             }
                         }
                     },
                     modifier = Modifier.testTag("submit_reset_button")
                 ) {
-                    Text("Verify & Reset")
+                    Text("Send Reset Link")
                 }
             },
             shape = RoundedCornerShape(20.dp)
