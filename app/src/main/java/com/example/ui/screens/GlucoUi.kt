@@ -985,7 +985,7 @@ fun LoginScreen(viewModel: GlucoViewModel) {
                 Spacer(modifier = Modifier.height(2.dp))
 
                 Text(
-                    text = "GlucoLog Tracker v1.0.7 (Build 8)",
+                    text = "GlucoLog Tracker v1.1.0 (Build 9)",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.outline.copy(alpha = 0.6f),
                     fontWeight = FontWeight.SemiBold,
@@ -2237,7 +2237,7 @@ fun HomeScreen(
                 verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
                 Text(
-                    text = "GlucoLog Tracker v1.0.7 (Build 8)",
+                    text = "GlucoLog Tracker v1.1.0 (Build 9)",
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.outline
@@ -6926,7 +6926,7 @@ fun SettingsScreen(
                                 color = MaterialTheme.colorScheme.outline
                             )
                             Text(
-                                text = "v1.0.7 (Build 8)",
+                                text = "v1.1.0 (Build 9)",
                                 style = MaterialTheme.typography.bodyMedium,
                                 fontWeight = FontWeight.Bold
                             )
