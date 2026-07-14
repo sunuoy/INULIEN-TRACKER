@@ -7562,9 +7562,8 @@ fun StepsScreen(
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.15f))
                 ) {
                     Column(
-                        modifier = Modifier.padding(20.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         Text(
                             text = "Today's Progress",
@@ -7573,38 +7572,129 @@ fun StepsScreen(
                             color = MaterialTheme.colorScheme.primary
                         )
 
-                        Box(
-                            contentAlignment = Alignment.Center,
-                            modifier = Modifier.size(140.dp)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            CircularProgressIndicator(
-                                progress = progress,
-                                strokeWidth = 10.dp,
-                                color = MaterialTheme.colorScheme.primary,
-                                trackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
-                                modifier = Modifier.fillMaxSize()
-                            )
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            // Left Column: Progress Ring
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                                modifier = Modifier.weight(1.1f)
+                            ) {
+                                Box(
+                                    contentAlignment = Alignment.Center,
+                                    modifier = Modifier.size(130.dp)
+                                ) {
+                                    CircularProgressIndicator(
+                                        progress = progress,
+                                        strokeWidth = 9.dp,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        trackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
+                                        modifier = Modifier.fillMaxSize()
+                                    )
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                        Text(
+                                            text = String.format("%,d", todaySteps),
+                                            style = MaterialTheme.typography.titleLarge,
+                                            fontWeight = FontWeight.Black,
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                        Text(
+                                            text = "Goal: $stepGoal",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.outline
+                                        )
+                                    }
+                                }
+
                                 Text(
-                                    text = String.format("%,d", todaySteps),
-                                    style = MaterialTheme.typography.headlineMedium,
-                                    fontWeight = FontWeight.Black,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                                Text(
-                                    text = "Goal: $stepGoal",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.outline
+                                    text = if (progress >= 1f) "Goal achieved!" else "${((1f - progress) * stepGoal).toInt()} steps left",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (progress >= 1f) Color(0xFF4CAF50) else MaterialTheme.colorScheme.outline,
+                                    textAlign = TextAlign.Center
                                 )
                             }
-                        }
 
-                        Text(
-                            text = if (progress >= 1f) "Goal achieved! Excellent job!" else "${((1f - progress) * stepGoal).toInt()} steps remaining to goal",
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            color = if (progress >= 1f) Color(0xFF4CAF50) else MaterialTheme.colorScheme.outline
-                        )
+                            Spacer(modifier = Modifier.width(12.dp))
+
+                            // Right Column: Height, Weight, BMI
+                            Column(
+                                modifier = Modifier.weight(0.9f),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                val heightM = currentProfile.heightCm / 100.0
+                                val bmi = if (heightM > 0) currentProfile.weightKg / (heightM * heightM) else 0.0
+                                val (bmiCategory, bmiColor) = when {
+                                    bmi <= 0.0 -> "N/A" to Color.Gray
+                                    bmi < 18.5 -> "Underweight" to Color(0xFFFBC02D)
+                                    bmi < 25.0 -> "Normal" to Color(0xFF4CAF50)
+                                    bmi < 30.0 -> "Overweight" to Color(0xFFF57C00)
+                                    else -> "Obese" to Color(0xFFD32F2F)
+                                }
+
+                                // Height Display
+                                Card(
+                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.6f)),
+                                    shape = RoundedCornerShape(10.dp),
+                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+                                ) {
+                                    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 5.dp)) {
+                                        Text("Height", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline, fontSize = 9.sp)
+                                        Text("${currentProfile.heightCm} cm", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+
+                                // Weight Display
+                                Card(
+                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.6f)),
+                                    shape = RoundedCornerShape(10.dp),
+                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+                                ) {
+                                    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 5.dp)) {
+                                        Text("Weight", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline, fontSize = 9.sp)
+                                        Text("${currentProfile.weightKg} kg", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+
+                                // BMI Display
+                                Card(
+                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.6f)),
+                                    shape = RoundedCornerShape(10.dp),
+                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+                                ) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 5.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Column {
+                                            Text("BMI", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline, fontSize = 9.sp)
+                                            Text(
+                                                text = if (bmi > 0) String.format("%.1f", bmi) else "N/A",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                fontWeight = FontWeight.Bold,
+                                                color = bmiColor
+                                            )
+                                        }
+                                        Box(
+                                            modifier = Modifier
+                                                .background(bmiColor.copy(alpha = 0.15f), RoundedCornerShape(4.dp))
+                                                .padding(horizontal = 4.dp, vertical = 2.dp)
+                                        ) {
+                                            Text(
+                                                text = bmiCategory,
+                                                color = bmiColor,
+                                                fontWeight = FontWeight.Black,
+                                                fontSize = 7.sp
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
