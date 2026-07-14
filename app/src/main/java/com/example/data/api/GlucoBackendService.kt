@@ -71,7 +71,8 @@ data class ReminderDto(
     @Json(name = "hour") val hour: Int,
     @Json(name = "minute") val minute: Int,
     @Json(name = "isEnabled") val isEnabled: Boolean,
-    @Json(name = "daysOfWeek") val daysOfWeek: String
+    @Json(name = "daysOfWeek") val daysOfWeek: String,
+    @Json(name = "tone") val tone: String = "Default"
 )
 
 @JsonClass(generateAdapter = true)

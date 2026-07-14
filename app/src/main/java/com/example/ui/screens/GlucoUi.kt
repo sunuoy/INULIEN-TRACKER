@@ -33,6 +33,8 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -849,7 +851,7 @@ fun LoginScreen(viewModel: GlucoViewModel) {
                 prefilledGoogleEmail = accountName
                 prefilledGoogleName = formattedName
                 prefilledGoogleUsername = namePart.lowercase()
-                showGoogleSignInDialog = true
+                viewModel.loginWithGoogleProfile(formattedName, accountName, namePart.lowercase())
             }
         }
     }
@@ -1843,148 +1845,6 @@ fun HomeScreen(
                 label = "waterTranslationY"
             )
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(9.dp)
-            ) {
-                // Log Insulin Button Card
-                Card(
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(76.dp)
-                        .clickable { onLogInsulinClick() }
-                        .testTag("home_add_insulin_button"),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
-                    shape = RoundedCornerShape(16.dp)
-                ) {
-                    Box(modifier = Modifier.fillMaxSize()) {
-                        val curveColor = Color(0xFF3F51B5)
-                        androidx.compose.foundation.Canvas(modifier = Modifier.matchParentSize()) {
-                            val path = androidx.compose.ui.graphics.Path().apply {
-                                moveTo(0f, size.height * 0.65f)
-                                cubicTo(
-                                    size.width * 0.35f, size.height * 0.55f,
-                                    size.width * 0.65f, size.height * 0.85f,
-                                    size.width, size.height * 0.5f
-                                )
-                                lineTo(size.width, size.height)
-                                lineTo(0f, size.height)
-                                close()
-                            }
-                            drawPath(
-                                path = path,
-                                brush = Brush.verticalGradient(
-                                    colors = listOf(
-                                        Color.Transparent,
-                                        curveColor.copy(alpha = 0.12f)
-                                    )
-                                )
-                            )
-                        }
-
-                        Row(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(horizontal = 11.dp, vertical = 9.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(9.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(31.dp)
-                                    .background(Color(0xFF3F51B5), CircleShape),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Vaccines,
-                                    contentDescription = "Insulin Icon",
-                                    tint = Color.White,
-                                    modifier = Modifier
-                                        .size(17.dp)
-                                        .graphicsLayer {
-                                            rotationZ = vaccinesRotation
-                                        }
-                                )
-                            }
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text("Insulin Dose", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                Text("Record Units", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSecondaryContainer.copy(0.7f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            }
-                        }
-                    }
-                }
-
-                // Log Glucose Button Card
-                Card(
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(76.dp)
-                        .clickable { onLogGlucoseClick() }
-                        .testTag("home_add_glucose_button"),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer),
-                    shape = RoundedCornerShape(16.dp)
-                ) {
-                    Box(modifier = Modifier.fillMaxSize()) {
-                        val curveColor = Color(0xFFFB8C00)
-                        androidx.compose.foundation.Canvas(modifier = Modifier.matchParentSize()) {
-                            val path = androidx.compose.ui.graphics.Path().apply {
-                                moveTo(0f, size.height * 0.65f)
-                                cubicTo(
-                                    size.width * 0.35f, size.height * 0.55f,
-                                    size.width * 0.65f, size.height * 0.85f,
-                                    size.width, size.height * 0.5f
-                                )
-                                lineTo(size.width, size.height)
-                                lineTo(0f, size.height)
-                                close()
-                            }
-                            drawPath(
-                                path = path,
-                                brush = Brush.verticalGradient(
-                                    colors = listOf(
-                                        Color.Transparent,
-                                        curveColor.copy(alpha = 0.12f)
-                                    )
-                                )
-                            )
-                        }
-
-                        Row(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(horizontal = 11.dp, vertical = 9.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(9.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(31.dp)
-                                    .background(Color(0xFFFB8C00), CircleShape),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.WaterDrop,
-                                    contentDescription = "Glucose Icon",
-                                    tint = Color.White,
-                                    modifier = Modifier
-                                        .size(17.dp)
-                                        .graphicsLayer {
-                                            translationY = waterTranslationY
-                                        }
-                                )
-                            }
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text("Glucose Level", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                Text("Log Sugar", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onTertiaryContainer.copy(0.7f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // Action Buttons Row 2 (Blood Pressure & Cartridge Refill)
-        item {
             val heartTransition = rememberInfiniteTransition(label = "heart")
             val heartScale by heartTransition.animateFloat(
                 initialValue = 0.9f,
@@ -2007,140 +1867,284 @@ fun HomeScreen(
                 label = "refreshRotation"
             )
 
-            Row(
+            Column(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(9.dp)
+                verticalArrangement = Arrangement.spacedBy(9.dp)
             ) {
-                // Log Blood Pressure Card
-                Card(
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(76.dp)
-                        .clickable { onLogBloodPressureClick() }
-                        .testTag("home_add_bp_button"),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)),
-                    shape = RoundedCornerShape(16.dp)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(9.dp)
                 ) {
-                    Box(modifier = Modifier.fillMaxSize()) {
-                        val curveColor = Color(0xFFE53935)
-                        androidx.compose.foundation.Canvas(modifier = Modifier.matchParentSize()) {
-                            val path = androidx.compose.ui.graphics.Path().apply {
-                                moveTo(0f, size.height * 0.65f)
-                                cubicTo(
-                                    size.width * 0.35f, size.height * 0.55f,
-                                    size.width * 0.65f, size.height * 0.85f,
-                                    size.width, size.height * 0.5f
-                                )
-                                lineTo(size.width, size.height)
-                                lineTo(0f, size.height)
-                                close()
-                            }
-                            drawPath(
-                                path = path,
-                                brush = Brush.verticalGradient(
-                                    colors = listOf(
-                                        Color.Transparent,
-                                        curveColor.copy(alpha = 0.12f)
+                    // Log Glucose Button Card
+                    Card(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(76.dp)
+                            .clickable { onLogGlucoseClick() }
+                            .testTag("home_add_glucose_button"),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer),
+                        shape = RoundedCornerShape(16.dp)
+                    ) {
+                        Box(modifier = Modifier.fillMaxSize()) {
+                            val curveColor = Color(0xFFFB8C00)
+                            androidx.compose.foundation.Canvas(modifier = Modifier.matchParentSize()) {
+                                val path = androidx.compose.ui.graphics.Path().apply {
+                                    moveTo(0f, size.height * 0.65f)
+                                    cubicTo(
+                                        size.width * 0.35f, size.height * 0.55f,
+                                        size.width * 0.65f, size.height * 0.85f,
+                                        size.width, size.height * 0.5f
+                                    )
+                                    lineTo(size.width, size.height)
+                                    lineTo(0f, size.height)
+                                    close()
+                                }
+                                drawPath(
+                                    path = path,
+                                    brush = Brush.verticalGradient(
+                                        colors = listOf(
+                                            Color.Transparent,
+                                            curveColor.copy(alpha = 0.12f)
+                                        )
                                     )
                                 )
-                            )
-                        }
+                            }
 
-                        Row(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(horizontal = 11.dp, vertical = 9.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(9.dp)
-                        ) {
-                            Box(
+                            Row(
                                 modifier = Modifier
-                                    .size(31.dp)
-                                    .background(Color(0xFFE53935), CircleShape),
-                                contentAlignment = Alignment.Center
+                                    .fillMaxSize()
+                                    .padding(horizontal = 11.dp, vertical = 9.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(9.dp)
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.Favorite,
-                                    contentDescription = "Blood Pressure Icon",
-                                    tint = Color.White,
+                                Box(
                                     modifier = Modifier
-                                        .size(17.dp)
-                                        .graphicsLayer {
-                                            scaleX = heartScale
-                                            scaleY = heartScale
-                                        }
+                                        .size(31.dp)
+                                        .background(Color(0xFFFB8C00), CircleShape),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.WaterDrop,
+                                        contentDescription = "Glucose Icon",
+                                        tint = Color.White,
+                                        modifier = Modifier
+                                            .size(17.dp)
+                                            .graphicsLayer {
+                                                translationY = waterTranslationY
+                                            }
+                                    )
+                                }
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text("Glucose Level", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    Text("Log Sugar", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onTertiaryContainer.copy(0.7f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                }
+                            }
+                        }
+                    }
+
+                    // Log Insulin Button Card
+                    Card(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(76.dp)
+                            .clickable { onLogInsulinClick() }
+                            .testTag("home_add_insulin_button"),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
+                        shape = RoundedCornerShape(16.dp)
+                    ) {
+                        Box(modifier = Modifier.fillMaxSize()) {
+                            val curveColor = Color(0xFF3F51B5)
+                            androidx.compose.foundation.Canvas(modifier = Modifier.matchParentSize()) {
+                                val path = androidx.compose.ui.graphics.Path().apply {
+                                    moveTo(0f, size.height * 0.65f)
+                                    cubicTo(
+                                        size.width * 0.35f, size.height * 0.55f,
+                                        size.width * 0.65f, size.height * 0.85f,
+                                        size.width, size.height * 0.5f
+                                    )
+                                    lineTo(size.width, size.height)
+                                    lineTo(0f, size.height)
+                                    close()
+                                }
+                                drawPath(
+                                    path = path,
+                                    brush = Brush.verticalGradient(
+                                        colors = listOf(
+                                            Color.Transparent,
+                                            curveColor.copy(alpha = 0.12f)
+                                        )
+                                    )
                                 )
                             }
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text("Blood Pressure", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                Text("Systolic/Diastolic", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(0.7f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(horizontal = 11.dp, vertical = 9.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(9.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(31.dp)
+                                        .background(Color(0xFF3F51B5), CircleShape),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Vaccines,
+                                        contentDescription = "Insulin Icon",
+                                        tint = Color.White,
+                                        modifier = Modifier
+                                            .size(17.dp)
+                                            .graphicsLayer {
+                                                rotationZ = vaccinesRotation
+                                            }
+                                    )
+                                }
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text("Insulin Dose", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    Text("Record Units", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSecondaryContainer.copy(0.7f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                }
                             }
                         }
                     }
                 }
 
-                // Log Cartridge Refill Card
-                Card(
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(76.dp)
-                        .clickable { onRefillClick() }
-                        .testTag("home_add_refill_button"),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)),
-                    shape = RoundedCornerShape(16.dp)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(9.dp)
                 ) {
-                    Box(modifier = Modifier.fillMaxSize()) {
-                        val curveColor = Color(0xFF00ACC1)
-                        androidx.compose.foundation.Canvas(modifier = Modifier.matchParentSize()) {
-                            val path = androidx.compose.ui.graphics.Path().apply {
-                                moveTo(0f, size.height * 0.65f)
-                                cubicTo(
-                                    size.width * 0.35f, size.height * 0.55f,
-                                    size.width * 0.65f, size.height * 0.85f,
-                                    size.width, size.height * 0.5f
-                                )
-                                lineTo(size.width, size.height)
-                                lineTo(0f, size.height)
-                                close()
-                            }
-                            drawPath(
-                                path = path,
-                                brush = Brush.verticalGradient(
-                                    colors = listOf(
-                                        Color.Transparent,
-                                        curveColor.copy(alpha = 0.12f)
+                    // Log Cartridge Refill Card
+                    Card(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(76.dp)
+                            .clickable { onRefillClick() }
+                            .testTag("home_add_refill_button"),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)),
+                        shape = RoundedCornerShape(16.dp)
+                    ) {
+                        Box(modifier = Modifier.fillMaxSize()) {
+                            val curveColor = Color(0xFF00ACC1)
+                            androidx.compose.foundation.Canvas(modifier = Modifier.matchParentSize()) {
+                                val path = androidx.compose.ui.graphics.Path().apply {
+                                    moveTo(0f, size.height * 0.65f)
+                                    cubicTo(
+                                        size.width * 0.35f, size.height * 0.55f,
+                                        size.width * 0.65f, size.height * 0.85f,
+                                        size.width, size.height * 0.5f
+                                    )
+                                    lineTo(size.width, size.height)
+                                    lineTo(0f, size.height)
+                                    close()
+                                }
+                                drawPath(
+                                    path = path,
+                                    brush = Brush.verticalGradient(
+                                        colors = listOf(
+                                            Color.Transparent,
+                                            curveColor.copy(alpha = 0.12f)
+                                        )
                                     )
                                 )
-                            )
-                        }
+                            }
 
-                        Row(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(horizontal = 11.dp, vertical = 9.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(9.dp)
-                        ) {
-                            Box(
+                            Row(
                                 modifier = Modifier
-                                    .size(31.dp)
-                                    .background(Color(0xFF00ACC1), CircleShape),
-                                contentAlignment = Alignment.Center
+                                    .fillMaxSize()
+                                    .padding(horizontal = 11.dp, vertical = 9.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(9.dp)
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.Refresh,
-                                    contentDescription = "Refill Icon",
-                                    tint = Color.White,
+                                Box(
                                     modifier = Modifier
-                                        .size(17.dp)
-                                        .graphicsLayer {
-                                            rotationZ = refreshRotation
-                                        }
+                                        .size(31.dp)
+                                        .background(Color(0xFF00ACC1), CircleShape),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Refresh,
+                                        contentDescription = "Refill Icon",
+                                        tint = Color.White,
+                                        modifier = Modifier
+                                            .size(17.dp)
+                                            .graphicsLayer {
+                                                rotationZ = refreshRotation
+                                            }
+                                    )
+                                }
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text("Cartridge Refill", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    Text("Change Capacity", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSecondaryContainer.copy(0.7f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                }
+                            }
+                        }
+                    }
+
+                    // Log Blood Pressure Card
+                    Card(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(76.dp)
+                            .clickable { onLogBloodPressureClick() }
+                            .testTag("home_add_bp_button"),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)),
+                        shape = RoundedCornerShape(16.dp)
+                    ) {
+                        Box(modifier = Modifier.fillMaxSize()) {
+                            val curveColor = Color(0xFFE53935)
+                            androidx.compose.foundation.Canvas(modifier = Modifier.matchParentSize()) {
+                                val path = androidx.compose.ui.graphics.Path().apply {
+                                    moveTo(0f, size.height * 0.65f)
+                                    cubicTo(
+                                        size.width * 0.35f, size.height * 0.55f,
+                                        size.width * 0.65f, size.height * 0.85f,
+                                        size.width, size.height * 0.5f
+                                    )
+                                    lineTo(size.width, size.height)
+                                    lineTo(0f, size.height)
+                                    close()
+                                }
+                                drawPath(
+                                    path = path,
+                                    brush = Brush.verticalGradient(
+                                        colors = listOf(
+                                            Color.Transparent,
+                                            curveColor.copy(alpha = 0.12f)
+                                        )
+                                    )
                                 )
                             }
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text("Cartridge Refill", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                Text("Change Capacity", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSecondaryContainer.copy(0.7f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(horizontal = 11.dp, vertical = 9.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(9.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(31.dp)
+                                        .background(Color(0xFFE53935), CircleShape),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Favorite,
+                                        contentDescription = "Blood Pressure Icon",
+                                        tint = Color.White,
+                                        modifier = Modifier
+                                            .size(17.dp)
+                                            .graphicsLayer {
+                                                scaleX = heartScale
+                                                scaleY = heartScale
+                                            }
+                                    )
+                                }
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text("Blood Pressure", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    Text("Systolic/Diastolic", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(0.7f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                }
                             }
                         }
                     }
@@ -2368,6 +2372,8 @@ fun HomeScreen(
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
+                    val activeFeed = if (todayGlucoseReadings.isNotEmpty()) todayGlucoseReadings else fallbackGlucoseReadings
+
                     // Header
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -2470,7 +2476,227 @@ fun HomeScreen(
                                 }
                             }
                             Spacer(modifier = Modifier.height(4.dp))
-                            Text("Total Insulin", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.outline)
+                        }
+                    }
+
+                    // Glucose Trend Sparkline Chart
+                    if (activeFeed.isNotEmpty()) {
+                        val chartReadings = remember(activeFeed) { activeFeed.sortedBy { it.dateTimeMillis } }
+                        
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(6.dp),
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    "Glucose Trend (${chartReadings.size} logs)",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                                )
+                                Text(
+                                    "Target: ${profile.targetGlucoseMin.toInt()}-${profile.targetGlucoseMax.toInt()} ${profile.glucoseUnit}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = Color(0xFF4CAF50),
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                            
+                            val primaryColor = MaterialTheme.colorScheme.primary
+                            val onSurfaceColor = MaterialTheme.colorScheme.onSurface
+                            val targetMin = profile.targetGlucoseMin
+                            val targetMax = profile.targetGlucoseMax
+                            val glucoseUnit = profile.glucoseUnit
+                            
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(106.dp)
+                                    .background(
+                                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.15f),
+                                        RoundedCornerShape(12.dp)
+                                    )
+                                    .padding(vertical = 14.dp, horizontal = 16.dp)
+                            ) {
+                                val textColor = onSurfaceColor.toArgb()
+                                val textPaint = remember(textColor) {
+                                    android.graphics.Paint().apply {
+                                        color = textColor
+                                        textSize = 24f
+                                        typeface = android.graphics.Typeface.DEFAULT_BOLD
+                                        textAlign = android.graphics.Paint.Align.CENTER
+                                    }
+                                }
+                                val labelColor = onSurfaceColor.copy(alpha = 0.5f).toArgb()
+                                val labelPaint = remember(labelColor) {
+                                    android.graphics.Paint().apply {
+                                        color = labelColor
+                                        textSize = 18f
+                                        textAlign = android.graphics.Paint.Align.LEFT
+                                    }
+                                }
+
+                                Canvas(modifier = Modifier.fillMaxSize()) {
+                                    val width = size.width
+                                    val height = size.height
+                                    
+                                    val minVal = (chartReadings.minOfOrNull { it.readingValue } ?: 70.0)
+                                        .coerceAtMost(targetMin - 20.0)
+                                    val maxVal = (chartReadings.maxOfOrNull { it.readingValue } ?: 180.0)
+                                        .coerceAtLeast(targetMax + 20.0)
+                                    val range = maxVal - minVal
+                                    
+                                    val targetMinY = (1f - ((targetMin - minVal) / range).toFloat()) * height
+                                    val targetMaxY = (1f - ((targetMax - minVal) / range).toFloat()) * height
+                                    
+                                    // Target Range background band
+                                    drawRect(
+                                        color = Color(0xFF4CAF50).copy(alpha = 0.04f),
+                                        topLeft = androidx.compose.ui.geometry.Offset(0f, targetMaxY),
+                                        size = androidx.compose.ui.geometry.Size(width, targetMinY - targetMaxY)
+                                    )
+                                    
+                                    val dashEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(10.dp.toPx(), 10.dp.toPx()), 0f)
+                                    // Dashed bounds
+                                    drawLine(
+                                        color = Color(0xFF4CAF50).copy(alpha = 0.25f),
+                                        start = androidx.compose.ui.geometry.Offset(0f, targetMaxY),
+                                        end = androidx.compose.ui.geometry.Offset(width, targetMaxY),
+                                        strokeWidth = 1.dp.toPx(),
+                                        pathEffect = dashEffect
+                                    )
+                                    drawLine(
+                                        color = Color(0xFF4CAF50).copy(alpha = 0.25f),
+                                        start = androidx.compose.ui.geometry.Offset(0f, targetMinY),
+                                        end = androidx.compose.ui.geometry.Offset(width, targetMinY),
+                                        strokeWidth = 1.dp.toPx(),
+                                        pathEffect = dashEffect
+                                    )
+                                    
+                                    // Label values
+                                    drawContext.canvas.nativeCanvas.drawText(
+                                        "Max Target: ${targetMax.toInt()}",
+                                        10f,
+                                        targetMaxY - 4.dp.toPx(),
+                                        labelPaint
+                                    )
+                                    drawContext.canvas.nativeCanvas.drawText(
+                                        "Min Target: ${targetMin.toInt()}",
+                                        10f,
+                                        targetMinY + 12.dp.toPx(),
+                                        labelPaint
+                                    )
+                                    
+                                    // Map points
+                                    val chartCount = chartReadings.size
+                                    val points = chartReadings.mapIndexed { index, reading ->
+                                        val x = if (chartCount > 1) {
+                                            index.toFloat() / (chartCount - 1) * width
+                                        } else {
+                                            width / 2f
+                                        }
+                                        val y = (1f - ((reading.readingValue - minVal) / range).toFloat()) * height
+                                        Pair(x, y)
+                                    }
+                                    
+                                    if (points.isNotEmpty()) {
+                                        // Draw bezier line
+                                        val path = androidx.compose.ui.graphics.Path().apply {
+                                            moveTo(points[0].first, points[0].second)
+                                            for (i in 1 until points.size) {
+                                                val p0 = points[i - 1]
+                                                val p1 = points[i]
+                                                val controlPointX1 = p0.first + (p1.first - p0.first) / 2
+                                                val controlPointY1 = p0.second
+                                                val controlPointX2 = p0.first + (p1.first - p0.first) / 2
+                                                val controlPointY2 = p1.second
+                                                cubicTo(
+                                                    controlPointX1, controlPointY1,
+                                                    controlPointX2, controlPointY2,
+                                                    p1.first, p1.second
+                                                )
+                                            }
+                                        }
+                                        
+                                        // Area gradient fill
+                                        val fillPath = androidx.compose.ui.graphics.Path().apply {
+                                            addPath(path)
+                                            lineTo(points.last().first, height)
+                                            lineTo(points.first().first, height)
+                                            close()
+                                        }
+                                        
+                                        drawPath(
+                                            path = fillPath,
+                                            brush = Brush.verticalGradient(
+                                                colors = listOf(
+                                                    primaryColor.copy(alpha = 0.15f),
+                                                    Color.Transparent
+                                                ),
+                                                startY = 0f,
+                                                endY = height
+                                            )
+                                        )
+                                        
+                                        drawPath(
+                                            path = path,
+                                            color = primaryColor,
+                                            style = androidx.compose.ui.graphics.drawscope.Stroke(
+                                                width = 3.dp.toPx(),
+                                                cap = androidx.compose.ui.graphics.StrokeCap.Round
+                                            )
+                                        )
+                                        
+                                        // Pre-calculate point dimensions to avoid Composable/Density context issues inside lambda
+                                        val radius1 = 7.dp.toPx()
+                                        val radius2 = 4.dp.toPx()
+                                        val radius3 = 2.5f.dp.toPx()
+                                        val textOffset = 10.dp.toPx()
+
+                                        // Points and labels
+                                        points.forEachIndexed { idx, pt ->
+                                            val reading = chartReadings[idx]
+                                            val isOutOfRange = reading.readingValue < targetMin || reading.readingValue > targetMax
+                                            val ptColor = if (isOutOfRange) Color(0xFFFF9800) else Color(0xFF4CAF50)
+                                            
+                                            // Glowing circle pointer
+                                            drawCircle(
+                                                color = ptColor.copy(alpha = 0.25f),
+                                                radius = radius1,
+                                                center = androidx.compose.ui.geometry.Offset(pt.first, pt.second)
+                                            )
+                                            drawCircle(
+                                                color = Color.White,
+                                                radius = radius2,
+                                                center = androidx.compose.ui.geometry.Offset(pt.first, pt.second)
+                                            )
+                                            drawCircle(
+                                                color = ptColor,
+                                                radius = radius3,
+                                                center = androidx.compose.ui.geometry.Offset(pt.first, pt.second)
+                                            )
+                                            
+                                            // Label value text
+                                            val textVal = if (glucoseUnit == "mmol/L") {
+                                                String.format(Locale.US, "%.1f", reading.readingValue)
+                                            } else {
+                                                reading.readingValue.toInt().toString()
+                                            }
+                                            
+                                            drawContext.canvas.nativeCanvas.drawText(
+                                                textVal,
+                                                pt.first,
+                                                pt.second - textOffset,
+                                                textPaint
+                                            )
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
 
@@ -2512,7 +2738,6 @@ fun HomeScreen(
                             }
                         }
 
-                        val activeFeed = if (todayGlucoseReadings.isNotEmpty()) todayGlucoseReadings else fallbackGlucoseReadings
                         if (activeFeed.isEmpty()) {
                             Card(
                                 modifier = Modifier.fillMaxWidth(),
@@ -3920,6 +4145,22 @@ fun ReminderCard(
                                 .padding(horizontal = 6.dp, vertical = 1.dp)
                         ) {
                             Text(target.reminderType, fontSize = 9.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.outline)
+                        }
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Box(
+                            modifier = Modifier
+                                .background(MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
+                                .padding(horizontal = 6.dp, vertical = 1.dp)
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                                Icon(
+                                    imageVector = Icons.Default.VolumeUp,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(10.dp),
+                                    tint = MaterialTheme.colorScheme.onSecondaryContainer
+                                )
+                                Text(target.tone, fontSize = 9.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSecondaryContainer)
+                            }
                         }
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(target.daysOfWeek, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
@@ -6498,6 +6739,7 @@ fun ReminderFormDialog(
     var hour by remember { mutableIntStateOf(viewModel.remHour) }
     var minute by remember { mutableIntStateOf(viewModel.remMinute) }
     var days by remember { mutableStateOf(viewModel.remDays.ifEmpty { "Daily" }) }
+    var tone by remember { mutableStateOf(viewModel.remTone.ifEmpty { "Default" }) }
 
     Dialog(onDismissRequest = onDismiss) {
         Card(
@@ -6599,6 +6841,34 @@ fun ReminderFormDialog(
                     )
                 }
 
+                Text("Reminder Tone", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.outline)
+                Row(
+                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    val toneOptions = listOf("Default", "Gentle Chime", "Digital Alarm", "Medical Alert", "Zen Harp")
+                    toneOptions.forEach { t ->
+                        val active = tone == t
+                        Button(
+                            onClick = { tone = t },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                                contentColor = if (active) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                            ),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Icon(
+                                    imageVector = if (active) Icons.Default.VolumeUp else Icons.Default.VolumeMute,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Text(t, fontSize = 11.sp, maxLines = 1)
+                            }
+                        }
+                    }
+                }
+
                 OutlinedTextField(
                     value = days,
                     onValueChange = { days = it },
@@ -6621,6 +6891,7 @@ fun ReminderFormDialog(
                             viewModel.remHour = hour
                             viewModel.remMinute = minute
                             viewModel.remDays = days
+                            viewModel.remTone = tone
                             onSave()
                         }
                     ) {
@@ -8358,76 +8629,7 @@ fun StepsScreen(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.Top
                             ) {
-                                // Left Column: Progress Ring
-                                Column(
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                                    modifier = Modifier.weight(1.1f)
-                                ) {
-                                    Box(
-                                        contentAlignment = Alignment.Center,
-                                        modifier = Modifier.size(130.dp)
-                                    ) {
-                                        // Outer decorative dashed halo circle
-                                        androidx.compose.foundation.Canvas(modifier = Modifier.fillMaxSize().padding(4.dp)) {
-                                            drawCircle(
-                                                color = if (progress >= 1f) Color(0xFF4CAF50).copy(alpha = 0.2f) else Color(0xFF4FC3F7).copy(alpha = 0.2f),
-                                                style = androidx.compose.ui.graphics.drawscope.Stroke(
-                                                    width = 1.dp.toPx(),
-                                                    pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(12f, 12f), 0f)
-                                                )
-                                            )
-                                        }
-
-                                        // Main dynamic circular indicator with rounded endpoints
-                                        CircularProgressIndicator(
-                                            progress = progress.coerceIn(0f, 1f),
-                                            strokeWidth = 10.dp,
-                                            color = if (progress >= 1f) Color(0xFF4CAF50) else Color(0xFF4FC3F7),
-                                            trackColor = Color.White.copy(alpha = 0.08f),
-                                            strokeCap = androidx.compose.ui.graphics.StrokeCap.Round,
-                                            modifier = Modifier.fillMaxSize()
-                                        )
-
-                                        // Metric stack in the center
-                                        Column(
-                                            horizontalAlignment = Alignment.CenterHorizontally,
-                                            verticalArrangement = Arrangement.Center
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Default.DirectionsWalk,
-                                                contentDescription = "Walk",
-                                                tint = if (progress >= 1f) Color(0xFF4CAF50) else Color(0xFF4FC3F7),
-                                                modifier = Modifier.size(24.dp).then(rememberRunningAnimation(isEnabled = isPermissionGranted))
-                                            )
-                                            Spacer(modifier = Modifier.height(2.dp))
-                                            Text(
-                                                text = String.format("%,d", todaySteps),
-                                                style = MaterialTheme.typography.titleLarge,
-                                                fontWeight = FontWeight.Black,
-                                                color = Color.White
-                                            )
-                                            Text(
-                                                text = "${(progress * 100).toInt()}%",
-                                                style = MaterialTheme.typography.labelSmall,
-                                                fontWeight = FontWeight.Bold,
-                                                color = if (progress >= 1f) Color(0xFF4CAF50) else Color.White.copy(alpha = 0.6f)
-                                            )
-                                        }
-                                    }
-
-                                    Text(
-                                        text = if (progress >= 1f) "Goal achieved!" else "${((1f - progress) * stepGoal).toInt()} steps left",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        fontWeight = FontWeight.Bold,
-                                        color = if (progress >= 1f) Color(0xFF4CAF50) else Color.White.copy(alpha = 0.6f),
-                                        textAlign = TextAlign.Center
-                                    )
-                                }
-
-                                Spacer(modifier = Modifier.width(12.dp))
-
-                                // Right Column: Height, Weight, BMI
+                                // Left Column: Height, Weight, BMI
                                 Column(
                                     modifier = Modifier.weight(1.0f),
                                     verticalArrangement = Arrangement.spacedBy(10.dp)
@@ -8444,7 +8646,7 @@ fun StepsScreen(
                                              border = BorderStroke(1.dp, Color.White.copy(alpha = 0.1f)),
                                              modifier = Modifier.weight(1f)
                                          ) {
-                                             Column(modifier = Modifier.fillMaxWidth().padding(12.dp)) {
+                                             Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 12.dp)) {
                                                  Row(
                                                      modifier = Modifier.fillMaxWidth(),
                                                      horizontalArrangement = Arrangement.SpaceBetween,
@@ -8452,7 +8654,7 @@ fun StepsScreen(
                                                  ) {
                                                      Text(
                                                          text = "Height",
-                                                         style = MaterialTheme.typography.labelMedium,
+                                                         style = MaterialTheme.typography.labelSmall,
                                                          color = Color.White.copy(alpha = 0.6f),
                                                          fontWeight = FontWeight.Medium
                                                      )
@@ -8460,16 +8662,31 @@ fun StepsScreen(
                                                          imageVector = Icons.Default.Straighten,
                                                          contentDescription = null,
                                                          tint = Color(0xFF4FC3F7).copy(alpha = 0.8f),
-                                                         modifier = Modifier.size(16.dp)
+                                                         modifier = Modifier.size(14.dp)
                                                      )
                                                  }
                                                  Spacer(modifier = Modifier.height(6.dp))
-                                                 Text(
-                                                     text = "${currentProfile.heightCm} cm",
-                                                     style = MaterialTheme.typography.titleMedium,
-                                                     fontWeight = FontWeight.Bold,
-                                                     color = Color.White
-                                                 )
+                                                 Row(
+                                                     verticalAlignment = Alignment.Bottom
+                                                 ) {
+                                                     Text(
+                                                         text = String.format(java.util.Locale.US, "%.1f", currentProfile.heightCm),
+                                                         style = MaterialTheme.typography.titleMedium,
+                                                         fontWeight = FontWeight.Bold,
+                                                         color = Color.White,
+                                                         maxLines = 1,
+                                                         softWrap = false
+                                                     )
+                                                     Spacer(modifier = Modifier.width(3.dp))
+                                                     Text(
+                                                         text = "cm",
+                                                         style = MaterialTheme.typography.bodySmall,
+                                                         color = Color.White.copy(alpha = 0.6f),
+                                                         modifier = Modifier.padding(bottom = 1.dp),
+                                                         maxLines = 1,
+                                                         softWrap = false
+                                                     )
+                                                 }
                                              }
                                          }
 
@@ -8480,7 +8697,7 @@ fun StepsScreen(
                                              border = BorderStroke(1.dp, Color.White.copy(alpha = 0.1f)),
                                              modifier = Modifier.weight(1f)
                                          ) {
-                                             Column(modifier = Modifier.fillMaxWidth().padding(12.dp)) {
+                                             Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 12.dp)) {
                                                  Row(
                                                      modifier = Modifier.fillMaxWidth(),
                                                      horizontalArrangement = Arrangement.SpaceBetween,
@@ -8488,7 +8705,7 @@ fun StepsScreen(
                                                  ) {
                                                      Text(
                                                          text = "Weight",
-                                                         style = MaterialTheme.typography.labelMedium,
+                                                         style = MaterialTheme.typography.labelSmall,
                                                          color = Color.White.copy(alpha = 0.6f),
                                                          fontWeight = FontWeight.Medium
                                                      )
@@ -8496,16 +8713,31 @@ fun StepsScreen(
                                                          imageVector = Icons.Default.Speed,
                                                          contentDescription = null,
                                                          tint = Color(0xFF4FC3F7).copy(alpha = 0.8f),
-                                                         modifier = Modifier.size(16.dp)
+                                                         modifier = Modifier.size(14.dp)
                                                      )
                                                  }
                                                  Spacer(modifier = Modifier.height(6.dp))
-                                                 Text(
-                                                     text = "${currentProfile.weightKg} kg",
-                                                     style = MaterialTheme.typography.titleMedium,
-                                                     fontWeight = FontWeight.Bold,
-                                                     color = Color.White
-                                                 )
+                                                 Row(
+                                                     verticalAlignment = Alignment.Bottom
+                                                 ) {
+                                                     Text(
+                                                         text = String.format(java.util.Locale.US, "%.1f", currentProfile.weightKg),
+                                                         style = MaterialTheme.typography.titleMedium,
+                                                         fontWeight = FontWeight.Bold,
+                                                         color = Color.White,
+                                                         maxLines = 1,
+                                                         softWrap = false
+                                                     )
+                                                     Spacer(modifier = Modifier.width(3.dp))
+                                                     Text(
+                                                         text = "kg",
+                                                         style = MaterialTheme.typography.bodySmall,
+                                                         color = Color.White.copy(alpha = 0.6f),
+                                                         modifier = Modifier.padding(bottom = 1.dp),
+                                                         maxLines = 1,
+                                                         softWrap = false
+                                                     )
+                                                 }
                                              }
                                          }
                                      }
@@ -8633,6 +8865,75 @@ fun StepsScreen(
                                              }
                                          }
                                      }
+                                }
+
+                                Spacer(modifier = Modifier.width(12.dp))
+
+                                // Right Column: Progress Ring
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                                    modifier = Modifier.weight(1.1f)
+                                ) {
+                                    Box(
+                                        contentAlignment = Alignment.Center,
+                                        modifier = Modifier.size(130.dp)
+                                    ) {
+                                        // Outer decorative dashed halo circle
+                                        androidx.compose.foundation.Canvas(modifier = Modifier.fillMaxSize().padding(4.dp)) {
+                                            drawCircle(
+                                                color = if (progress >= 1f) Color(0xFF4CAF50).copy(alpha = 0.2f) else Color(0xFF4FC3F7).copy(alpha = 0.2f),
+                                                style = androidx.compose.ui.graphics.drawscope.Stroke(
+                                                    width = 1.dp.toPx(),
+                                                    pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(12f, 12f), 0f)
+                                                )
+                                            )
+                                        }
+
+                                        // Main dynamic circular indicator with rounded endpoints
+                                        CircularProgressIndicator(
+                                            progress = progress.coerceIn(0f, 1f),
+                                            strokeWidth = 10.dp,
+                                            color = if (progress >= 1f) Color(0xFF4CAF50) else Color(0xFF4FC3F7),
+                                            trackColor = Color.White.copy(alpha = 0.08f),
+                                            strokeCap = androidx.compose.ui.graphics.StrokeCap.Round,
+                                            modifier = Modifier.fillMaxSize()
+                                        )
+
+                                        // Metric stack in the center
+                                        Column(
+                                            horizontalAlignment = Alignment.CenterHorizontally,
+                                            verticalArrangement = Arrangement.Center
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.DirectionsWalk,
+                                                contentDescription = "Walk",
+                                                tint = if (progress >= 1f) Color(0xFF4CAF50) else Color(0xFF4FC3F7),
+                                                modifier = Modifier.size(24.dp).then(rememberRunningAnimation(isEnabled = isPermissionGranted))
+                                            )
+                                            Spacer(modifier = Modifier.height(2.dp))
+                                            Text(
+                                                text = String.format("%,d", todaySteps),
+                                                style = MaterialTheme.typography.titleLarge,
+                                                fontWeight = FontWeight.Black,
+                                                color = Color.White
+                                            )
+                                            Text(
+                                                text = "${(progress * 100).toInt()}%",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                fontWeight = FontWeight.Bold,
+                                                color = if (progress >= 1f) Color(0xFF4CAF50) else Color.White.copy(alpha = 0.6f)
+                                            )
+                                        }
+                                    }
+
+                                    Text(
+                                        text = if (progress >= 1f) "Goal achieved!" else "${((1f - progress) * stepGoal).toInt()} steps left",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (progress >= 1f) Color(0xFF4CAF50) else Color.White.copy(alpha = 0.6f),
+                                        textAlign = TextAlign.Center
+                                    )
                                 }
                             }
                         }

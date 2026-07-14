@@ -89,7 +89,7 @@ class GlucoViewModel(application: Application) : AndroidViewModel(application) {
     val googleDriveLastSyncTime: StateFlow<String> = _googleDriveLastSyncTime.asStateFlow()
 
     // Selected Theme State
-    private val _selectedTheme = MutableStateFlow("midnight_carbon")
+    private val _selectedTheme = MutableStateFlow("arctic")
     val selectedTheme: StateFlow<String> = _selectedTheme.asStateFlow()
 
     fun selectTheme(themeId: String) {
@@ -160,6 +160,7 @@ class GlucoViewModel(application: Application) : AndroidViewModel(application) {
     var remHour = 8
     var remMinute = 0
     var remDays = "Daily"
+    var remTone = "Default"
     var selectedReminderIdToEdit: Long? = null
 
     // Form Temporary State (Blood Pressure)
@@ -266,7 +267,8 @@ class GlucoViewModel(application: Application) : AndroidViewModel(application) {
                         hour = it.hour,
                         minute = it.minute,
                         isEnabled = it.isEnabled,
-                        daysOfWeek = it.daysOfWeek
+                        daysOfWeek = it.daysOfWeek,
+                        tone = it.tone
                     )
                 }
 
@@ -408,7 +410,8 @@ class GlucoViewModel(application: Application) : AndroidViewModel(application) {
                                 "hour" to rem.hour,
                                 "minute" to rem.minute,
                                 "isEnabled" to rem.isEnabled,
-                                "daysOfWeek" to rem.daysOfWeek
+                                "daysOfWeek" to rem.daysOfWeek,
+                                "tone" to rem.tone
                             )
                             remColl.document(rem.id.toString()).set(map)
                         }
@@ -784,7 +787,14 @@ class GlucoViewModel(application: Application) : AndroidViewModel(application) {
                 .putString("user_pass_$username", "google_verified_auth")
                 .putString("user_email_$username", email)
                 .putString("email_to_user_$email", username)
+                .putBoolean("remember_me_checked", true)
+                .putString("remember_me_username", username)
+                .putString("remember_me_password", "google_verified_auth")
                 .apply()
+                
+            _rememberMe.value = true
+            _savedUsernameOrEmail.value = username
+            _savedPassword.value = "google_verified_auth"
                 
             // 2. Clear state and log in as standard patient
             _isAdmin.value = false
@@ -1160,7 +1170,7 @@ class GlucoViewModel(application: Application) : AndroidViewModel(application) {
             val prefs = application.getSharedPreferences("gluco_auth_prefs", Context.MODE_PRIVATE)
             val backendUrl = prefs.getString("gluco_backend_base_url", "https://httpbin.org/") ?: "https://httpbin.org/"
             val lastSync = prefs.getString("gluco_last_sync_time", "Never") ?: "Never"
-            val theme = prefs.getString("selected_theme", "midnight_carbon") ?: "midnight_carbon"
+            val theme = prefs.getString("selected_theme", "arctic") ?: "arctic"
             val gdEnabled = prefs.getBoolean("gd_sync_enabled", false)
             val gdToken = prefs.getString("gd_access_token", "") ?: ""
             val gdLastSync = prefs.getString("gd_last_sync_time", "Never") ?: "Never"
@@ -1731,7 +1741,8 @@ class GlucoViewModel(application: Application) : AndroidViewModel(application) {
                 hour = remHour,
                 minute = remMinute,
                 isEnabled = true,
-                daysOfWeek = remDays
+                daysOfWeek = remDays,
+                tone = remTone
             )
         } else {
             Reminder(
@@ -1740,7 +1751,8 @@ class GlucoViewModel(application: Application) : AndroidViewModel(application) {
                 hour = remHour,
                 minute = remMinute,
                 isEnabled = true,
-                daysOfWeek = remDays
+                daysOfWeek = remDays,
+                tone = remTone
             )
         }
 
@@ -1769,6 +1781,7 @@ class GlucoViewModel(application: Application) : AndroidViewModel(application) {
         remHour = reminder.hour
         remMinute = reminder.minute
         remDays = reminder.daysOfWeek
+        remTone = reminder.tone
     }
 
     fun resetReminderForm() {
@@ -1779,6 +1792,7 @@ class GlucoViewModel(application: Application) : AndroidViewModel(application) {
         remHour = now.get(Calendar.HOUR_OF_DAY)
         remMinute = now.get(Calendar.MINUTE)
         remDays = "Daily"
+        remTone = "Default"
     }
 
     // Save Profile Settings
@@ -2840,7 +2854,8 @@ class GlucoViewModel(application: Application) : AndroidViewModel(application) {
                                 hour = obj.optInt("hour", 8),
                                 minute = obj.optInt("minute", 0),
                                 isEnabled = obj.optBoolean("isEnabled", true),
-                                daysOfWeek = obj.optString("daysOfWeek", "Daily")
+                                daysOfWeek = obj.optString("daysOfWeek", "Daily"),
+                                tone = obj.optString("tone", "Default")
                             )
                         )
                     }

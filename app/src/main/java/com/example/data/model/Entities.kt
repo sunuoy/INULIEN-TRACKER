@@ -29,7 +29,8 @@ data class Reminder(
     val hour: Int,            // 0 - 23
     val minute: Int,          // 0 - 59
     val isEnabled: Boolean = true,
-    val daysOfWeek: String = "Daily" // Comma-separated list like "Mon,Tue,Wed,Thu,Fri,Sat,Sun"
+    val daysOfWeek: String = "Daily", // Comma-separated list like "Mon,Tue,Wed,Thu,Fri,Sat,Sun"
+    val tone: String = "Default"
 )
 
 @Entity(tableName = "user_profiles")
