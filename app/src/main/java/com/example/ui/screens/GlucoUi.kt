@@ -2313,19 +2313,81 @@ fun HomeScreen(
                         else -> MaterialTheme.colorScheme.primary
                     }
 
-                    // Progress bar
-                    Box(
+                    // Custom Glass Liquid Cartridge Graphic
+                    Canvas(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(10.dp)
-                            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(5.dp))
+                            .height(16.dp)
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth(percent.toFloat())
-                                .fillMaxHeight()
-                                .background(barColor, RoundedCornerShape(5.dp))
+                        val w = size.width
+                        val h = size.height
+                        
+                        // 1. Draw glass background tube
+                        drawRoundRect(
+                            color = Color.LightGray.copy(alpha = 0.2f),
+                            topLeft = Offset(0f, 0f),
+                            size = Size(w, h),
+                            cornerRadius = androidx.compose.ui.geometry.CornerRadius(h / 2f, h / 2f)
                         )
+                        
+                        // 2. Draw liquid inside (if percent > 0)
+                        if (percent > 0.0) {
+                            val liquidWidth = w * percent.toFloat()
+                            val liquidBrush = Brush.horizontalGradient(
+                                colors = listOf(
+                                    barColor.copy(alpha = 0.8f),
+                                    barColor
+                                )
+                            )
+                            drawRoundRect(
+                                brush = liquidBrush,
+                                topLeft = Offset(0f, 0f),
+                                size = Size(liquidWidth, h),
+                                cornerRadius = androidx.compose.ui.geometry.CornerRadius(h / 2f, h / 2f)
+                            )
+                        }
+                        
+                        // 3. Draw glass capsule sheen highlight (horizontal glossy reflection line on top half)
+                        val sheenBrush = Brush.verticalGradient(
+                            colors = listOf(
+                                Color.White.copy(alpha = 0.45f),
+                                Color.Transparent
+                            )
+                        )
+                        drawRoundRect(
+                            brush = sheenBrush,
+                            topLeft = Offset(2f, 2f),
+                            size = Size(w - 4f, h * 0.35f),
+                            cornerRadius = androidx.compose.ui.geometry.CornerRadius(h / 2f, h / 2f)
+                        )
+                        
+                        // 4. Draw outer glass tube border
+                        drawRoundRect(
+                            color = Color.LightGray.copy(alpha = 0.5f),
+                            topLeft = Offset(0f, 0f),
+                            size = Size(w, h),
+                            cornerRadius = androidx.compose.ui.geometry.CornerRadius(h / 2f, h / 2f),
+                            style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.5.dp.toPx())
+                        )
+                        
+                        // 5. Draw cartridge hash marks (representing units levels)
+                        val totalTicks = 15
+                        for (i in 1 until totalTicks) {
+                            val tickX = w * (i.toFloat() / totalTicks)
+                            val tickHeight = if (i % 5 == 0) h * 0.35f else h * 0.2f
+                            drawLine(
+                                color = Color.Gray.copy(alpha = 0.3f),
+                                start = Offset(tickX, 0f),
+                                end = Offset(tickX, tickHeight),
+                                strokeWidth = 1.dp.toPx()
+                            )
+                            drawLine(
+                                color = Color.Gray.copy(alpha = 0.3f),
+                                start = Offset(tickX, h),
+                                end = Offset(tickX, h - tickHeight),
+                                strokeWidth = 1.dp.toPx()
+                            )
+                        }
                     }
 
                     Spacer(modifier = Modifier.height(8.dp))
@@ -2743,22 +2805,49 @@ fun HomeScreen(
                                 modifier = Modifier.fillMaxWidth(),
                                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
                             ) {
-                                Row(
-                                    modifier = Modifier.padding(12.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Outlined.Info,
-                                        contentDescription = "No records",
-                                        tint = MaterialTheme.colorScheme.outline,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                    Text(
-                                        "No glucose logs collected. Use quick actions to log blood sugar values.",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.outline
-                                    )
+                                Box(modifier = Modifier.fillMaxWidth()) {
+                                    androidx.compose.foundation.Canvas(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(42.dp)
+                                            .align(Alignment.CenterEnd)
+                                    ) {
+                                        val w = size.width
+                                        val h = size.height
+                                        val path = androidx.compose.ui.graphics.Path().apply {
+                                            moveTo(w * 0.65f, h * 0.5f)
+                                            lineTo(w * 0.72f, h * 0.5f)
+                                            lineTo(w * 0.75f, h * 0.15f)
+                                            lineTo(w * 0.78f, h * 0.85f)
+                                            lineTo(w * 0.81f, h * 0.5f)
+                                            lineTo(w * 0.95f, h * 0.5f)
+                                        }
+                                        drawPath(
+                                            path = path,
+                                            color = Color(0xFFEF5350).copy(alpha = 0.08f),
+                                            style = androidx.compose.ui.graphics.drawscope.Stroke(
+                                                width = 2.dp.toPx(),
+                                                cap = androidx.compose.ui.graphics.StrokeCap.Round
+                                            )
+                                        )
+                                    }
+                                    Row(
+                                        modifier = Modifier.padding(12.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Outlined.Info,
+                                            contentDescription = "No records",
+                                            tint = MaterialTheme.colorScheme.outline,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Text(
+                                            "No glucose logs collected. Use quick actions to log blood sugar values.",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.outline
+                                        )
+                                    }
                                 }
                             }
                         } else {
@@ -2858,22 +2947,49 @@ fun HomeScreen(
                                 modifier = Modifier.fillMaxWidth(),
                                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
                             ) {
-                                Row(
-                                    modifier = Modifier.padding(12.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Outlined.Info,
-                                        contentDescription = "No insulin doses today",
-                                        tint = MaterialTheme.colorScheme.outline,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                    Text(
-                                        "No insulin dosage logs collected for today. Log clinical doses above.",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.outline
-                                    )
+                                Box(modifier = Modifier.fillMaxWidth()) {
+                                    androidx.compose.foundation.Canvas(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(42.dp)
+                                            .align(Alignment.CenterEnd)
+                                    ) {
+                                        val w = size.width
+                                        val h = size.height
+                                        val path = androidx.compose.ui.graphics.Path().apply {
+                                            moveTo(w * 0.65f, h * 0.5f)
+                                            lineTo(w * 0.72f, h * 0.5f)
+                                            lineTo(w * 0.75f, h * 0.15f)
+                                            lineTo(w * 0.78f, h * 0.85f)
+                                            lineTo(w * 0.81f, h * 0.5f)
+                                            lineTo(w * 0.95f, h * 0.5f)
+                                        }
+                                        drawPath(
+                                            path = path,
+                                            color = Color(0xFF2196F3).copy(alpha = 0.08f),
+                                            style = androidx.compose.ui.graphics.drawscope.Stroke(
+                                                width = 2.dp.toPx(),
+                                                cap = androidx.compose.ui.graphics.StrokeCap.Round
+                                            )
+                                        )
+                                    }
+                                    Row(
+                                        modifier = Modifier.padding(12.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Outlined.Info,
+                                            contentDescription = "No insulin doses today",
+                                            tint = MaterialTheme.colorScheme.outline,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Text(
+                                            "No insulin dosage logs collected for today. Log clinical doses above.",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.outline
+                                        )
+                                    }
                                 }
                             }
                         } else {
@@ -4041,7 +4157,50 @@ fun RemindersScreen(
                     .padding(horizontal = 16.dp, vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(Icons.Default.AccessAlarms, contentDescription = "Alarms header", modifier = Modifier.size(32.dp), tint = MaterialTheme.colorScheme.primary)
+                Box(
+                    modifier = Modifier.size(48.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    val infiniteTransition = rememberInfiniteTransition(label = "alarmPulse")
+                    val pulseScale by infiniteTransition.animateFloat(
+                        initialValue = 0.8f,
+                        targetValue = 1.3f,
+                        animationSpec = infiniteRepeatable(
+                            animation = tween(1200, easing = FastOutSlowInEasing),
+                            repeatMode = RepeatMode.Reverse
+                        ),
+                        label = "pulseScale"
+                    )
+                    val pulseAlpha by infiniteTransition.animateFloat(
+                        initialValue = 0.1f,
+                        targetValue = 0.35f,
+                        animationSpec = infiniteRepeatable(
+                            animation = tween(1200, easing = FastOutSlowInEasing),
+                            repeatMode = RepeatMode.Reverse
+                        ),
+                        label = "pulseAlpha"
+                    )
+                    
+                    Canvas(modifier = Modifier.fillMaxSize()) {
+                        drawCircle(
+                            color = Color(0xFF2196F3).copy(alpha = pulseAlpha),
+                            radius = (size.width / 2f) * pulseScale
+                        )
+                    }
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.AccessAlarms,
+                            contentDescription = "Alarms header",
+                            modifier = Modifier.size(20.dp),
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    }
+                }
                 Spacer(modifier = Modifier.width(12.dp))
                 Column {
                     Text("Daily Reminders", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
@@ -4093,110 +4252,141 @@ fun ReminderCard(
             containerColor = if (target.isEnabled) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
         )
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Row(
-                modifier = Modifier.weight(1f),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(42.dp)
-                        .background(
-                            if (target.isEnabled) {
-                                if (target.reminderType == "Insulin") MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.tertiaryContainer
-                            } else {
-                                MaterialTheme.colorScheme.outline.copy(0.15f)
-                            },
-                            CircleShape
-                        ),
-                    contentAlignment = Alignment.Center
+        Box(modifier = Modifier.fillMaxWidth()) {
+            if (target.isEnabled) {
+                androidx.compose.foundation.Canvas(
+                    modifier = Modifier.matchParentSize()
                 ) {
-                    Icon(
-                        imageVector = if (target.reminderType == "Insulin") Icons.Default.Vaccines else Icons.Default.WaterDrop,
-                        contentDescription = "Alert type",
-                        tint = if (target.isEnabled) {
-                            if (target.reminderType == "Insulin") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.tertiary
-                        } else {
-                            MaterialTheme.colorScheme.outline
-                        },
-                        modifier = Modifier.size(20.dp)
+                    val w = size.width
+                    val h = size.height
+                    drawCircle(
+                        color = Color.Gray.copy(alpha = 0.04f),
+                        radius = h * 0.7f,
+                        center = androidx.compose.ui.geometry.Offset(w * 0.85f, h * 0.5f)
                     )
-                }
-
-                Spacer(modifier = Modifier.width(12.dp))
-
-                Column {
-                    Text(
-                        text = target.label,
-                        fontWeight = FontWeight.Bold,
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = if (target.isEnabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                    drawCircle(
+                        color = Color.Gray.copy(alpha = 0.02f),
+                        radius = h * 1.1f,
+                        center = androidx.compose.ui.geometry.Offset(w * 0.85f, h * 0.5f)
                     )
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier
-                                .background(MaterialTheme.colorScheme.outline.copy(0.12f), RoundedCornerShape(4.dp))
-                                .padding(horizontal = 6.dp, vertical = 1.dp)
-                        ) {
-                            Text(target.reminderType, fontSize = 9.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.outline)
-                        }
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Box(
-                            modifier = Modifier
-                                .background(MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
-                                .padding(horizontal = 6.dp, vertical = 1.dp)
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-                                Icon(
-                                    imageVector = Icons.Default.VolumeUp,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(10.dp),
-                                    tint = MaterialTheme.colorScheme.onSecondaryContainer
-                                )
-                                Text(target.tone, fontSize = 9.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSecondaryContainer)
-                            }
-                        }
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(target.daysOfWeek, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
-                    }
                 }
             }
-
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(
-                    horizontalAlignment = Alignment.End,
-                    modifier = Modifier.padding(end = 8.dp)
+            
+            Column(modifier = Modifier.padding(16.dp)) {
+                // Top section: Left Info details & Right Time/Switch details
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text(
-                        text = viewModel.formatHourMinute(target.hour, target.minute),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = if (target.isEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
-                    )
-                    Row {
-                        IconButton(onClick = onEdit, modifier = Modifier.size(32.dp)) {
-                            Icon(Icons.Default.Edit, contentDescription = "Edit reminder", modifier = Modifier.size(16.dp))
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(42.dp)
+                                .background(
+                                    if (target.isEnabled) {
+                                        if (target.reminderType == "Insulin") MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.tertiaryContainer
+                                    } else {
+                                        MaterialTheme.colorScheme.outline.copy(0.15f)
+                                    },
+                                    CircleShape
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = if (target.reminderType == "Insulin") Icons.Default.Vaccines else Icons.Default.WaterDrop,
+                                contentDescription = "Alert type",
+                                tint = if (target.isEnabled) {
+                                    if (target.reminderType == "Insulin") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.tertiary
+                                } else {
+                                    MaterialTheme.colorScheme.outline
+                                },
+                                modifier = Modifier.size(20.dp)
+                            )
                         }
-                        IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
-                            Icon(Icons.Default.Delete, contentDescription = "Delete reminder", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(16.dp))
+
+                        Spacer(modifier = Modifier.width(12.dp))
+
+                        Column(modifier = Modifier.padding(end = 8.dp)) {
+                            Text(
+                                text = target.label,
+                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = if (target.isEnabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(
+                                    modifier = Modifier
+                                        .background(MaterialTheme.colorScheme.outline.copy(0.12f), RoundedCornerShape(4.dp))
+                                        .padding(horizontal = 6.dp, vertical = 1.dp)
+                                ) {
+                                    Text(target.reminderType, fontSize = 9.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.outline)
+                                }
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .background(MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
+                                        .padding(horizontal = 6.dp, vertical = 1.dp)
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                                        Icon(
+                                            imageVector = Icons.Default.VolumeUp,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(10.dp),
+                                            tint = MaterialTheme.colorScheme.onSecondaryContainer
+                                        )
+                                        Text(target.tone, fontSize = 9.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSecondaryContainer)
+                                    }
+                                }
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(target.daysOfWeek, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
+                            }
                         }
+                    }
+
+                    // Right side: Time display and Switch toggle
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Text(
+                            text = viewModel.formatHourMinute(target.hour, target.minute),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = if (target.isEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
+                        )
+                        Switch(
+                            checked = target.isEnabled,
+                            onCheckedChange = { onToggle() },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = MaterialTheme.colorScheme.primary,
+                                checkedTrackColor = MaterialTheme.colorScheme.primaryContainer
+                            )
+                        )
                     }
                 }
 
-                Switch(
-                    checked = target.isEnabled,
-                    onCheckedChange = { onToggle() },
-                    colors = SwitchDefaults.colors(
-                        checkedThumbColor = MaterialTheme.colorScheme.primary,
-                        checkedTrackColor = MaterialTheme.colorScheme.primaryContainer
-                    )
-                )
+                // Bottom section: Divider & Control buttons (Edit & Delete)
+                Spacer(modifier = Modifier.height(10.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = onEdit, modifier = Modifier.size(32.dp)) {
+                        Icon(Icons.Default.Edit, contentDescription = "Edit reminder", modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.outline)
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
+                        Icon(Icons.Default.Delete, contentDescription = "Delete reminder", tint = MaterialTheme.colorScheme.error.copy(alpha = 0.8f), modifier = Modifier.size(16.dp))
+                    }
+                }
             }
         }
     }
