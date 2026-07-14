@@ -978,6 +978,32 @@ class GlucoViewModel(application: Application) : AndroidViewModel(application) {
         _isUpdateAvailable.value = false
     }
 
+    private fun getRedirectedConnection(urlStr: String): java.net.HttpURLConnection {
+        var url = java.net.URL(urlStr)
+        var connection = url.openConnection() as java.net.HttpURLConnection
+        connection.instanceFollowRedirects = true
+        connection.connectTimeout = 15000
+        connection.readTimeout = 15000
+        
+        var status = connection.responseCode
+        var redirects = 0
+        while (status == java.net.HttpURLConnection.HTTP_MOVED_TEMP ||
+               status == java.net.HttpURLConnection.HTTP_MOVED_PERM ||
+               status == 307 || status == 308) {
+            if (redirects > 5) break
+            val newUrl = connection.getHeaderField("Location") ?: break
+            connection.disconnect()
+            url = java.net.URL(newUrl)
+            connection = url.openConnection() as java.net.HttpURLConnection
+            connection.instanceFollowRedirects = true
+            connection.connectTimeout = 15000
+            connection.readTimeout = 15000
+            status = connection.responseCode
+            redirects++
+        }
+        return connection
+    }
+
     fun downloadAndInstallApk(apkUrl: String) {
         if (_isDownloading.value) return
         _isDownloading.value = true
@@ -987,106 +1013,65 @@ class GlucoViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val context = getApplication<Application>()
-                val downloadManager = context.getSystemService(Context.DOWNLOAD_SERVICE) as android.app.DownloadManager
-                val fileName = "GlucoLog_update_${System.currentTimeMillis()}.apk"
+                val connection = getRedirectedConnection(apkUrl)
+                connection.connect()
 
-                val request = android.app.DownloadManager.Request(android.net.Uri.parse(apkUrl))
-                    .setTitle("GlucoLog Update")
-                    .setDescription("Downloading latest version...")
-                    .setNotificationVisibility(android.app.DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-                    .setDestinationInExternalPublicDir(android.os.Environment.DIRECTORY_DOWNLOADS, fileName)
-                    .setMimeType("application/vnd.android.package-archive")
+                if (connection.responseCode != java.net.HttpURLConnection.HTTP_OK) {
+                    throw java.io.IOException("Server returned HTTP " + connection.responseCode + " " + connection.responseMessage)
+                }
 
-                val downloadId = downloadManager.enqueue(request)
+                val fileLength = connection.contentLength
+                val input = connection.inputStream
+                val updateFile = java.io.File(context.cacheDir, "gluco_update.apk")
+                if (updateFile.exists()) {
+                    updateFile.delete()
+                }
 
-                // Poll download progress
-                var downloading = true
-                while (downloading) {
-                    val query = android.app.DownloadManager.Query().setFilterById(downloadId)
-                    val cursor = downloadManager.query(query)
-                    if (cursor != null && cursor.moveToFirst()) {
-                        val statusIdx = cursor.getColumnIndex(android.app.DownloadManager.COLUMN_STATUS)
-                        val bytesIdx = cursor.getColumnIndex(android.app.DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR)
-                        val totalIdx = cursor.getColumnIndex(android.app.DownloadManager.COLUMN_TOTAL_SIZE_BYTES)
-
-                        val status = if (statusIdx >= 0) cursor.getInt(statusIdx) else -1
-                        val bytesDownloaded = if (bytesIdx >= 0) cursor.getLong(bytesIdx) else 0L
-                        val totalBytes = if (totalIdx >= 0) cursor.getLong(totalIdx) else 0L
-
-                        when (status) {
-                            android.app.DownloadManager.STATUS_RUNNING -> {
-                                val progress = if (totalBytes > 0) bytesDownloaded.toFloat() / totalBytes else 0f
-                                withContext(Dispatchers.Main) {
-                                    _downloadProgress.value = progress
-                                    val mbDown = String.format("%.1f", bytesDownloaded / 1_048_576.0)
-                                    val mbTotal = String.format("%.1f", totalBytes / 1_048_576.0)
-                                    _downloadStatus.value = "Downloading... $mbDown / $mbTotal MB"
-                                }
-                            }
-                            android.app.DownloadManager.STATUS_SUCCESSFUL -> {
-                                downloading = false
-                                withContext(Dispatchers.Main) {
-                                    _downloadProgress.value = 1f
-                                    _downloadStatus.value = "Download complete. Installing..."
-                                }
-
-                                // Get the downloaded file URI and trigger install
-                                val localUriIdx = cursor.getColumnIndex(android.app.DownloadManager.COLUMN_LOCAL_URI)
-                                val localUriStr = if (localUriIdx >= 0) cursor.getString(localUriIdx) else null
-
-                                if (localUriStr != null) {
-                                    val fileUri = android.net.Uri.parse(localUriStr)
-                                    val file = java.io.File(fileUri.path ?: "")
-                                    val contentUri = androidx.core.content.FileProvider.getUriForFile(
-                                        context,
-                                        "${context.packageName}.fileprovider",
-                                        file
-                                    )
-                                    val installIntent = android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
-                                        setDataAndType(contentUri, "application/vnd.android.package-archive")
-                                        flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK or
-                                                android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
-                                    }
-                                    withContext(Dispatchers.Main) {
-                                        try {
-                                            context.startActivity(installIntent)
-                                            _downloadStatus.value = "Install dialog opened"
-                                        } catch (e: Exception) {
-                                            _downloadStatus.value = "Could not open installer: ${e.message}"
-                                        }
-                                    }
-                                } else {
-                                    withContext(Dispatchers.Main) {
-                                        _downloadStatus.value = "Download finished but file not found"
-                                    }
-                                }
-                            }
-                            android.app.DownloadManager.STATUS_FAILED -> {
-                                downloading = false
-                                withContext(Dispatchers.Main) {
-                                    _downloadStatus.value = "Download failed. Please try again."
-                                }
-                            }
-                            android.app.DownloadManager.STATUS_PAUSED -> {
-                                withContext(Dispatchers.Main) {
-                                    _downloadStatus.value = "Download paused..."
-                                }
-                            }
-                            android.app.DownloadManager.STATUS_PENDING -> {
-                                withContext(Dispatchers.Main) {
-                                    _downloadStatus.value = "Waiting to start..."
-                                }
-                            }
-                        }
-                        cursor.close()
-                    } else {
-                        downloading = false
+                val output = java.io.FileOutputStream(updateFile)
+                val data = ByteArray(4096)
+                var total: Long = 0
+                var count: Int
+                while (input.read(data).also { count = it } != -1) {
+                    total += count
+                    if (fileLength > 0) {
+                        val progress = total.toFloat() / fileLength
                         withContext(Dispatchers.Main) {
-                            _downloadStatus.value = "Download disappeared"
+                            _downloadProgress.value = progress
+                            val mbDown = String.format("%.1f", total / 1_048_576.0)
+                            val mbTotal = String.format("%.1f", fileLength / 1_048_576.0)
+                            _downloadStatus.value = "Downloading... $mbDown / $mbTotal MB"
                         }
                     }
-                    if (downloading) {
-                        kotlinx.coroutines.delay(500L)
+                    output.write(data, 0, count)
+                }
+
+                output.flush()
+                output.close()
+                input.close()
+
+                withContext(Dispatchers.Main) {
+                    _downloadProgress.value = 1f
+                    _downloadStatus.value = "Download complete. Installing..."
+                }
+
+                val contentUri = androidx.core.content.FileProvider.getUriForFile(
+                    context,
+                    "${context.packageName}.fileprovider",
+                    updateFile
+                )
+
+                val installIntent = android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
+                    setDataAndType(contentUri, "application/vnd.android.package-archive")
+                    flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK or
+                            android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
+                }
+
+                withContext(Dispatchers.Main) {
+                    try {
+                        context.startActivity(installIntent)
+                        _downloadStatus.value = "Install dialog opened"
+                    } catch (e: Exception) {
+                        _downloadStatus.value = "Could not open installer: ${e.message}"
                     }
                 }
             } catch (e: Exception) {
