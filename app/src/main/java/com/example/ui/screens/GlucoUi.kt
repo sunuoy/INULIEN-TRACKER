@@ -275,25 +275,31 @@ fun GlucoAppLayout(viewModel: GlucoViewModel) {
         val currentScreen by viewModel.currentScreen.collectAsStateWithLifecycle()
         Scaffold(
             topBar = {
-                if (currentScreen != AppScreen.SETTINGS) {
-                    TopAppBar(
-                        title = {
-                            val titleText = when (currentScreen) {
-                                AppScreen.HOME -> "Clinical Dashboard"
-                                AppScreen.HISTORY -> "Clinical Logs History"
-                                AppScreen.STEPS -> "Steps Tracker"
-                                AppScreen.REMINDERS -> "Medication Reminders"
-                                AppScreen.REPORTS -> "Interactive Reports"
-                                AppScreen.PROFILE -> "User Settings & Profile"
-                                else -> "System Settings"
+                val isSettings = currentScreen == AppScreen.SETTINGS
+                TopAppBar(
+                    title = {
+                        val titleText = when (currentScreen) {
+                            AppScreen.HOME -> "Clinical Dashboard"
+                            AppScreen.HISTORY -> "Clinical Logs History"
+                            AppScreen.STEPS -> "Steps Tracker"
+                            AppScreen.REMINDERS -> "Medication Reminders"
+                            AppScreen.REPORTS -> "Interactive Reports"
+                            AppScreen.PROFILE -> "User Settings & Profile"
+                            AppScreen.SETTINGS -> "Settings"
+                            else -> "System Settings"
+                        }
+                        Text(
+                            text = titleText,
+                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                    },
+                    navigationIcon = {
+                        if (isSettings) {
+                            IconButton(onClick = { viewModel.navigateTo(AppScreen.PROFILE) }) {
+                                Icon(Icons.Default.ArrowBack, contentDescription = "Back")
                             }
-                            Text(
-                                text = titleText,
-                                fontWeight = FontWeight.Bold,
-                                style = MaterialTheme.typography.titleMedium
-                            )
-                        },
-                        navigationIcon = {
+                        } else {
                             IconButton(
                                 onClick = {
                                     scope.launch {
@@ -323,13 +329,13 @@ fun GlucoAppLayout(viewModel: GlucoViewModel) {
                                     )
                                 }
                             }
-                        },
-                        actions = {
-                            // Create an explicit Quick Sync button
+                        }
+                    },
+                    actions = {
+                        if (!isSettings) {
                             IconButton(
                                 onClick = {
                                     viewModel.triggerUploadSync()
-
                                     android.widget.Toast.makeText(context, "Syncing medical data...", android.widget.Toast.LENGTH_SHORT).show()
                                 },
                                 modifier = Modifier.testTag("action_sync_data")
@@ -340,15 +346,15 @@ fun GlucoAppLayout(viewModel: GlucoViewModel) {
                                     tint = MaterialTheme.colorScheme.primary
                                 )
                             }
-                        },
-                        colors = TopAppBarDefaults.topAppBarColors(
-                            containerColor = MaterialTheme.colorScheme.surface,
-                            titleContentColor = MaterialTheme.colorScheme.onSurface,
-                            navigationIconContentColor = MaterialTheme.colorScheme.primary,
-                            actionIconContentColor = MaterialTheme.colorScheme.primary
-                        )
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        titleContentColor = MaterialTheme.colorScheme.onSurface,
+                        navigationIconContentColor = MaterialTheme.colorScheme.primary,
+                        actionIconContentColor = MaterialTheme.colorScheme.primary
                     )
-                }
+                )
             },
             bottomBar = {
                 NavigationBar(
@@ -2441,6 +2447,7 @@ fun HistoryScreen(
     }
 
     Scaffold(
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         floatingActionButton = {
             FloatingActionButton(
                 onClick = {
@@ -3363,6 +3370,7 @@ fun RemindersScreen(
     val remindersList by viewModel.reminders.collectAsStateWithLifecycle()
 
     Scaffold(
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         floatingActionButton = {
             FloatingActionButton(
                 onClick = onAddReminderClick,
@@ -6860,29 +6868,13 @@ fun SettingsScreen(
         }
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Settings", fontWeight = FontWeight.Bold) },
-                navigationIcon = {
-                    IconButton(onClick = onBackClick) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back back")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                )
-            )
-        }
-    ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .verticalScroll(rememberScrollState())
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
             // Connection/Auth status Card
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -7460,7 +7452,6 @@ fun SettingsScreen(
                 }
             }
         }
-    }
 
     // Backup & Restore Modals
     if (showExportDialog) {
@@ -7609,6 +7600,7 @@ fun StepsScreen(
     }
 
     Scaffold(
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         floatingActionButton = {
             FloatingActionButton(
                 onClick = onAddStepClick,
