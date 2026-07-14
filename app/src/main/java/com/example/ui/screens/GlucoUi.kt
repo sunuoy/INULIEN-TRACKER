@@ -7532,8 +7532,10 @@ fun StepsScreen(
         recCal.get(java.util.Calendar.YEAR) == todayYear && recCal.get(java.util.Calendar.DAY_OF_YEAR) == todayDay
     }.sumOf { it.steps }
 
-    val stepGoal = currentProfile.stepGoal
-    val progress = (todaySteps.toFloat() / stepGoal).coerceIn(0f, 1f)
+    val stepGoal = if (currentProfile.stepGoal > 0) currentProfile.stepGoal else 10000
+    val progress = (todaySteps.toFloat() / stepGoal).let { 
+        if (it.isNaN() || it.isInfinite()) 0f else it.coerceIn(0f, 1f) 
+    }
 
     Scaffold(
         floatingActionButton = {
