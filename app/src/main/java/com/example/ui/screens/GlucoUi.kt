@@ -1687,7 +1687,7 @@ fun HomeScreen(
                     shape = RoundedCornerShape(16.dp)
                 ) {
                     Box(modifier = Modifier.fillMaxSize()) {
-                        val curveColor = MaterialTheme.colorScheme.primary
+                        val curveColor = Color(0xFF3F51B5)
                         androidx.compose.foundation.Canvas(modifier = Modifier.matchParentSize()) {
                             val path = androidx.compose.ui.graphics.Path().apply {
                                 moveTo(0f, size.height * 0.65f)
@@ -1720,7 +1720,7 @@ fun HomeScreen(
                             Box(
                                 modifier = Modifier
                                     .size(36.dp)
-                                    .background(MaterialTheme.colorScheme.primary, CircleShape),
+                                    .background(Color(0xFF3F51B5), CircleShape),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(Icons.Default.Vaccines, contentDescription = "Insulin Icon", tint = Color.White, modifier = Modifier.size(20.dp))
@@ -1744,7 +1744,7 @@ fun HomeScreen(
                     shape = RoundedCornerShape(16.dp)
                 ) {
                     Box(modifier = Modifier.fillMaxSize()) {
-                        val curveColor = MaterialTheme.colorScheme.tertiary
+                        val curveColor = Color(0xFFFB8C00)
                         androidx.compose.foundation.Canvas(modifier = Modifier.matchParentSize()) {
                             val path = androidx.compose.ui.graphics.Path().apply {
                                 moveTo(0f, size.height * 0.65f)
@@ -1777,7 +1777,7 @@ fun HomeScreen(
                             Box(
                                 modifier = Modifier
                                     .size(36.dp)
-                                    .background(MaterialTheme.colorScheme.tertiary, CircleShape),
+                                    .background(Color(0xFFFB8C00), CircleShape),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(Icons.Default.WaterDrop, contentDescription = "Glucose Icon", tint = Color.White, modifier = Modifier.size(20.dp))
@@ -1809,7 +1809,7 @@ fun HomeScreen(
                     shape = RoundedCornerShape(16.dp)
                 ) {
                     Box(modifier = Modifier.fillMaxSize()) {
-                        val curveColor = MaterialTheme.colorScheme.primary
+                        val curveColor = Color(0xFFE53935)
                         androidx.compose.foundation.Canvas(modifier = Modifier.matchParentSize()) {
                             val path = androidx.compose.ui.graphics.Path().apply {
                                 moveTo(0f, size.height * 0.65f)
@@ -1842,7 +1842,7 @@ fun HomeScreen(
                             Box(
                                 modifier = Modifier
                                     .size(36.dp)
-                                    .background(MaterialTheme.colorScheme.primary, CircleShape),
+                                    .background(Color(0xFFE53935), CircleShape),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(Icons.Default.Favorite, contentDescription = "Blood Pressure Icon", tint = Color.White, modifier = Modifier.size(20.dp))
@@ -1866,7 +1866,7 @@ fun HomeScreen(
                     shape = RoundedCornerShape(16.dp)
                 ) {
                     Box(modifier = Modifier.fillMaxSize()) {
-                        val curveColor = MaterialTheme.colorScheme.secondary
+                        val curveColor = Color(0xFF00ACC1)
                         androidx.compose.foundation.Canvas(modifier = Modifier.matchParentSize()) {
                             val path = androidx.compose.ui.graphics.Path().apply {
                                 moveTo(0f, size.height * 0.65f)
@@ -1899,7 +1899,7 @@ fun HomeScreen(
                             Box(
                                 modifier = Modifier
                                     .size(36.dp)
-                                    .background(MaterialTheme.colorScheme.secondary, CircleShape),
+                                    .background(Color(0xFF00ACC1), CircleShape),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(Icons.Default.Refresh, contentDescription = "Refill Icon", tint = Color.White, modifier = Modifier.size(20.dp))
