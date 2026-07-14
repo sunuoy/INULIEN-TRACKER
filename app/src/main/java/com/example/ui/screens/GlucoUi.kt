@@ -7297,6 +7297,9 @@ fun SettingsScreen(
             val latestVersion by viewModel.latestReleaseVersion.collectAsStateWithLifecycle()
             val latestApkUrl by viewModel.latestReleaseApkUrl.collectAsStateWithLifecycle()
             val releaseNotes by viewModel.latestReleaseNotes.collectAsStateWithLifecycle()
+            val dlProgress by viewModel.downloadProgress.collectAsStateWithLifecycle()
+            val isDownloading by viewModel.isDownloading.collectAsStateWithLifecycle()
+            val dlStatus by viewModel.downloadStatus.collectAsStateWithLifecycle()
 
             Card(
                 modifier = Modifier.fillMaxWidth().testTag("app_updates_card"),
@@ -7309,7 +7312,7 @@ fun SettingsScreen(
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     Text(
-                        text = "App Version & GitHub Updates",
+                        text = "App Version & Updates",
                         fontWeight = FontWeight.Bold,
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onSurface
@@ -7335,7 +7338,8 @@ fun SettingsScreen(
                         
                         Button(
                             onClick = { viewModel.checkForAppUpdates() },
-                            shape = RoundedCornerShape(10.dp)
+                            shape = RoundedCornerShape(10.dp),
+                            enabled = !isDownloading
                         ) {
                             Icon(Icons.Default.Refresh, contentDescription = "Check update", modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(6.dp))
@@ -7346,15 +7350,15 @@ fun SettingsScreen(
                     if (updateStatus != null) {
                         Divider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
                         
-                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Text(
                                 text = "Status: $updateStatus",
                                 style = MaterialTheme.typography.bodyMedium,
                                 fontWeight = FontWeight.Bold,
-                                color = if (updateStatus?.startsWith("New") == true) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                                color = if (updateStatus?.contains("Update") == true) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                             )
 
-                            if (updateStatus?.startsWith("New") == true && !latestApkUrl.isNullOrEmpty()) {
+                            if (!latestApkUrl.isNullOrEmpty()) {
                                 if (!releaseNotes.isNullOrEmpty()) {
                                     Text(
                                         text = "Release Notes:\n$releaseNotes",
@@ -7365,23 +7369,90 @@ fun SettingsScreen(
                                     )
                                 }
 
+                                // Download progress section
+                                if (isDownloading || dlStatus != null) {
+                                    Card(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        shape = RoundedCornerShape(12.dp),
+                                        colors = CardDefaults.cardColors(
+                                            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.2f)
+                                        )
+                                    ) {
+                                        Column(
+                                            modifier = Modifier.padding(12.dp),
+                                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                            ) {
+                                                if (isDownloading) {
+                                                    CircularProgressIndicator(
+                                                        modifier = Modifier.size(16.dp),
+                                                        strokeWidth = 2.dp,
+                                                        color = MaterialTheme.colorScheme.primary
+                                                    )
+                                                } else if (dlProgress >= 1f) {
+                                                    Icon(
+                                                        Icons.Default.CheckCircle,
+                                                        contentDescription = "Done",
+                                                        tint = Color(0xFF4CAF50),
+                                                        modifier = Modifier.size(16.dp)
+                                                    )
+                                                }
+                                                Text(
+                                                    text = dlStatus ?: "",
+                                                    style = MaterialTheme.typography.labelMedium,
+                                                    fontWeight = FontWeight.SemiBold,
+                                                    color = MaterialTheme.colorScheme.onSurface
+                                                )
+                                            }
+
+                                            if (isDownloading) {
+                                                LinearProgressIndicator(
+                                                    progress = dlProgress,
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .height(6.dp)
+                                                        .clip(RoundedCornerShape(3.dp)),
+                                                    color = MaterialTheme.colorScheme.primary,
+                                                    trackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                                                )
+                                                Text(
+                                                    text = "${(dlProgress * 100).toInt()}%",
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = MaterialTheme.colorScheme.primary,
+                                                    modifier = Modifier.align(Alignment.End)
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // Download & Install button
                                 Button(
                                     onClick = {
-                                        try {
-                                            val browserIntent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse(latestApkUrl))
-                                            browserIntent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                                            context.startActivity(browserIntent)
-                                        } catch (e: Exception) {
-                                            android.widget.Toast.makeText(context, "Could not open browser: ${e.message}", android.widget.Toast.LENGTH_LONG).show()
-                                        }
+                                        viewModel.downloadAndInstallApk(latestApkUrl!!)
                                     },
                                     modifier = Modifier.fillMaxWidth().height(44.dp),
                                     shape = RoundedCornerShape(10.dp),
-                                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                                    enabled = !isDownloading
                                 ) {
-                                    Icon(Icons.Default.ArrowDownward, contentDescription = "Download")
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text("Download APK from GitHub")
+                                    if (isDownloading) {
+                                        CircularProgressIndicator(
+                                            modifier = Modifier.size(18.dp),
+                                            color = MaterialTheme.colorScheme.onPrimary,
+                                            strokeWidth = 2.dp
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text("Downloading...")
+                                    } else {
+                                        Icon(Icons.Default.SystemUpdate, contentDescription = "Install")
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text("Download & Install Update")
+                                    }
                                 }
                             }
                         }
