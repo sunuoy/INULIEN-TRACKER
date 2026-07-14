@@ -4494,6 +4494,9 @@ fun ProfileScreen(viewModel: GlucoViewModel) {
     var tMin by remember(currentProfile) { mutableStateOf(currentProfile.targetGlucoseMin.toString()) }
     var tMax by remember(currentProfile) { mutableStateOf(currentProfile.targetGlucoseMax.toString()) }
     var gUnit by remember(currentProfile) { mutableStateOf(currentProfile.glucoseUnit) }
+    var stepGoalInput by remember(currentProfile) { mutableStateOf(currentProfile.stepGoal.toString()) }
+    var heightInput by remember(currentProfile) { mutableStateOf(currentProfile.heightCm.toString()) }
+    var weightInput by remember(currentProfile) { mutableStateOf(currentProfile.weightKg.toString()) }
 
     var selectedAvatarIndex by remember(currentProfile.id) {
         mutableStateOf(prefs.getInt("profile_avatar_${currentProfile.id}", 0))
@@ -4962,6 +4965,226 @@ fun ProfileScreen(viewModel: GlucoViewModel) {
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text("Save Active", fontSize = 12.sp, maxLines = 1)
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    // Step Goal, Height, Weight inputs row
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = stepGoalInput,
+                            onValueChange = { stepGoalInput = it },
+                            label = { Text("Step Goal") },
+                            modifier = Modifier.weight(1f),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            shape = RoundedCornerShape(10.dp),
+                            singleLine = true
+                        )
+                        OutlinedTextField(
+                            value = heightInput,
+                            onValueChange = { heightInput = it },
+                            label = { Text("Height (cm)") },
+                            modifier = Modifier.weight(1f),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            shape = RoundedCornerShape(10.dp),
+                            singleLine = true
+                        )
+                        OutlinedTextField(
+                            value = weightInput,
+                            onValueChange = { weightInput = it },
+                            label = { Text("Weight (kg)") },
+                            modifier = Modifier.weight(1f),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            shape = RoundedCornerShape(10.dp),
+                            singleLine = true
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    // Buttons Group (Save Changes & Save as New Profile)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Outlined Save as New
+                        OutlinedButton(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(46.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            onClick = {
+                                val pMin = tMin.toDoubleOrNull() ?: 70.0
+                                val pMax = tMax.toDoubleOrNull() ?: 140.0
+                                val pSteps = stepGoalInput.toIntOrNull() ?: 10000
+                                val pHeight = heightInput.toDoubleOrNull() ?: 170.0
+                                val pWeight = weightInput.toDoubleOrNull() ?: 70.0
+                                viewModel.saveNewProfileFlow(
+                                    com.example.data.model.UserProfile(
+                                        id = 0,
+                                        userName = uName.ifEmpty { "Patient" },
+                                        doctorName = dName,
+                                        doctorEmail = dMail,
+                                        doctorPhone = dPhone,
+                                        targetGlucoseMin = pMin,
+                                        targetGlucoseMax = pMax,
+                                        glucoseUnit = gUnit,
+                                        isActive = true,
+                                        stepGoal = pSteps,
+                                        heightCm = pHeight,
+                                        weightKg = pWeight
+                                    )
+                                )
+                            },
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary)
+                        ) {
+                            Icon(
+                                Icons.Default.Add,
+                                contentDescription = "New Profile Logo",
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Save as New", fontSize = 12.sp, maxLines = 1)
+                        }
+
+                        // Filled Save Changes
+                        Button(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(46.dp)
+                                .testTag("profile_save_button_clinical_profile"),
+                            shape = RoundedCornerShape(12.dp),
+                            onClick = {
+                                val pMin = tMin.toDoubleOrNull() ?: 70.0
+                                val pMax = tMax.toDoubleOrNull() ?: 140.0
+                                val pSteps = stepGoalInput.toIntOrNull() ?: 10000
+                                val pHeight = heightInput.toDoubleOrNull() ?: 170.0
+                                val pWeight = weightInput.toDoubleOrNull() ?: 70.0
+                                viewModel.saveProfile(
+                                    com.example.data.model.UserProfile(
+                                        id = currentProfile.id,
+                                        userName = uName.ifEmpty { "Patient" },
+                                        doctorName = dName,
+                                        doctorEmail = dMail,
+                                        doctorPhone = dPhone,
+                                        targetGlucoseMin = pMin,
+                                        targetGlucoseMax = pMax,
+                                        glucoseUnit = gUnit,
+                                        isActive = true,
+                                        cartridgeCapacity = currentProfile.cartridgeCapacity,
+                                        cartridgeRemaining = currentProfile.cartridgeRemaining,
+                                        stepGoal = pSteps,
+                                        heightCm = pHeight,
+                                        weightKg = pWeight
+                                    )
+                                )
+                            }
+                        ) {
+                            Icon(
+                                Icons.Default.Save,
+                                contentDescription = "Save Profile Logo",
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Save Active", fontSize = 12.sp, maxLines = 1)
+                        }
+                    }
+                }
+            }
+        }
+
+        // BMI & Fitness Health Summary Card
+        item {
+            val heightM = currentProfile.heightCm / 100.0
+            val bmi = if (heightM > 0) currentProfile.weightKg / (heightM * heightM) else 0.0
+            val (bmiCategory, bmiColor) = when {
+                bmi <= 0.0 -> "N/A" to Color.Gray
+                bmi < 18.5 -> "Underweight" to Color(0xFFFBC02D) // Yellow
+                bmi < 25.0 -> "Normal Weight" to Color(0xFF4CAF50) // Green
+                bmi < 30.0 -> "Overweight" to Color(0xFFF57C00) // Orange
+                else -> "Obese" to Color(0xFFD32F2F) // Red
+            }
+
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.12f)),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f))
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "BMI & Health Summary",
+                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Box(
+                            modifier = Modifier
+                                .background(bmiColor, RoundedCornerShape(8.dp))
+                                .padding(horizontal = 10.dp, vertical = 5.dp)
+                        ) {
+                            Text(
+                                text = bmiCategory,
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.labelSmall
+                            )
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Estimated BMI", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
+                            Text(
+                                text = if (bmi > 0) String.format("%.1f kg/m²", bmi) else "N/A",
+                                style = MaterialTheme.typography.headlineMedium,
+                                fontWeight = FontWeight.Black,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+
+                        Column(
+                            modifier = Modifier.weight(1.2f),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text("Height:", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
+                                Text("${currentProfile.heightCm} cm", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text("Weight:", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
+                                Text("${currentProfile.weightKg} kg", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text("Step Goal:", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
+                                Text(String.format("%,d", currentProfile.stepGoal), style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+                            }
                         }
                     }
                 }
@@ -6001,6 +6224,9 @@ fun ProfileEditDialog(
     var tMin by remember { mutableStateOf(currentProfile.targetGlucoseMin.toString()) }
     var tMax by remember { mutableStateOf(currentProfile.targetGlucoseMax.toString()) }
     var gUnit by remember { mutableStateOf(currentProfile.glucoseUnit) }
+    var stepGoalInput by remember { mutableStateOf(currentProfile.stepGoal.toString()) }
+    var heightInput by remember { mutableStateOf(currentProfile.heightCm.toString()) }
+    var weightInput by remember { mutableStateOf(currentProfile.weightKg.toString()) }
 
     Dialog(onDismissRequest = onDismiss) {
         Card(
@@ -6233,6 +6459,42 @@ fun ProfileEditDialog(
 
                 Spacer(modifier = Modifier.height(4.dp))
 
+                // Step Goal, Height, Weight inputs row
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    OutlinedTextField(
+                        value = stepGoalInput,
+                        onValueChange = { stepGoalInput = it },
+                        label = { Text("Step Goal") },
+                        modifier = Modifier.weight(1f),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        shape = RoundedCornerShape(10.dp),
+                        singleLine = true
+                    )
+                    OutlinedTextField(
+                        value = heightInput,
+                        onValueChange = { heightInput = it },
+                        label = { Text("Height (cm)") },
+                        modifier = Modifier.weight(1f),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        shape = RoundedCornerShape(10.dp),
+                        singleLine = true
+                    )
+                    OutlinedTextField(
+                        value = weightInput,
+                        onValueChange = { weightInput = it },
+                        label = { Text("Weight (kg)") },
+                        modifier = Modifier.weight(1f),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        shape = RoundedCornerShape(10.dp),
+                        singleLine = true
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(6.dp))
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -6257,6 +6519,9 @@ fun ProfileEditDialog(
                             onClick = {
                                 val pMin = tMin.toDoubleOrNull() ?: 70.0
                                 val pMax = tMax.toDoubleOrNull() ?: 140.0
+                                val pSteps = stepGoalInput.toIntOrNull() ?: 10000
+                                val pHeight = heightInput.toDoubleOrNull() ?: 170.0
+                                val pWeight = weightInput.toDoubleOrNull() ?: 70.0
                                 onSaveAsNew(
                                     UserProfile(
                                         id = 0,
@@ -6267,7 +6532,10 @@ fun ProfileEditDialog(
                                         targetGlucoseMin = pMin,
                                         targetGlucoseMax = pMax,
                                         glucoseUnit = gUnit,
-                                        isActive = true
+                                        isActive = true,
+                                        stepGoal = pSteps,
+                                        heightCm = pHeight,
+                                        weightKg = pWeight
                                     )
                                 )
                             },
@@ -6292,6 +6560,9 @@ fun ProfileEditDialog(
                         onClick = {
                             val pMin = tMin.toDoubleOrNull() ?: 70.0
                             val pMax = tMax.toDoubleOrNull() ?: 140.0
+                            val pSteps = stepGoalInput.toIntOrNull() ?: 10000
+                            val pHeight = heightInput.toDoubleOrNull() ?: 170.0
+                            val pWeight = weightInput.toDoubleOrNull() ?: 70.0
                             onSave(
                                 currentProfile.copy(
                                     userName = uName.ifEmpty { "Patient" },
@@ -6300,7 +6571,10 @@ fun ProfileEditDialog(
                                     doctorPhone = dPhone,
                                     targetGlucoseMin = pMin,
                                     targetGlucoseMax = pMax,
-                                    glucoseUnit = gUnit
+                                    glucoseUnit = gUnit,
+                                    stepGoal = pSteps,
+                                    heightCm = pHeight,
+                                    weightKg = pWeight
                                 )
                             )
                         }
@@ -7245,6 +7519,7 @@ fun StepsScreen(
     onEditStep: (com.example.data.model.StepCountRecord) -> Unit
 ) {
     val stepRecords by viewModel.stepRecords.collectAsStateWithLifecycle()
+    val currentProfile by viewModel.userProfile.collectAsStateWithLifecycle()
     val context = androidx.compose.ui.platform.LocalContext.current
 
     // Calculate today's steps
@@ -7257,7 +7532,7 @@ fun StepsScreen(
         recCal.get(java.util.Calendar.YEAR) == todayYear && recCal.get(java.util.Calendar.DAY_OF_YEAR) == todayDay
     }.sumOf { it.steps }
 
-    val stepGoal = 10000
+    val stepGoal = currentProfile.stepGoal
     val progress = (todaySteps.toFloat() / stepGoal).coerceIn(0f, 1f)
 
     Scaffold(

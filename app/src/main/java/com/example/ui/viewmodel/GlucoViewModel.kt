@@ -445,7 +445,10 @@ class GlucoViewModel(application: Application) : AndroidViewModel(application) {
                     "targetGlucoseMax" to activeProfile.targetGlucoseMax,
                     "glucoseUnit" to activeProfile.glucoseUnit,
                     "cartridgeCapacity" to activeProfile.cartridgeCapacity,
-                    "cartridgeRemaining" to activeProfile.cartridgeRemaining
+                    "cartridgeRemaining" to activeProfile.cartridgeRemaining,
+                    "stepGoal" to activeProfile.stepGoal,
+                    "heightCm" to activeProfile.heightCm,
+                    "weightKg" to activeProfile.weightKg
                 )
                 db.collection("users").document(userId).set(profileMap)
 
@@ -1088,7 +1091,10 @@ class GlucoViewModel(application: Application) : AndroidViewModel(application) {
         targetGlucoseMin = 80.0,
         targetGlucoseMax = 140.0,
         glucoseUnit = "mg/dL",
-        isActive = true
+        isActive = true,
+        stepGoal = 10000,
+        heightCm = 170.0,
+        weightKg = 70.0
     )
 
     private fun ensureMinimumSetup() {
@@ -2505,6 +2511,9 @@ class GlucoViewModel(application: Application) : AndroidViewModel(application) {
                     obj.put("isActive", item.isActive)
                     obj.put("cartridgeCapacity", item.cartridgeCapacity)
                     obj.put("cartridgeRemaining", item.cartridgeRemaining)
+                    obj.put("stepGoal", item.stepGoal)
+                    obj.put("heightCm", item.heightCm)
+                    obj.put("weightKg", item.weightKg)
                     profileArr.put(obj)
                 }
                 root.put("profiles", profileArr)
@@ -2559,7 +2568,10 @@ class GlucoViewModel(application: Application) : AndroidViewModel(application) {
                                 glucoseUnit = obj.optString("glucoseUnit", "mg/dL"),
                                 isActive = obj.optBoolean("isActive", false),
                                 cartridgeCapacity = obj.optDouble("cartridgeCapacity", 300.0),
-                                cartridgeRemaining = obj.optDouble("cartridgeRemaining", 0.0)
+                                cartridgeRemaining = obj.optDouble("cartridgeRemaining", 0.0),
+                                stepGoal = obj.optInt("stepGoal", 10000),
+                                heightCm = obj.optDouble("heightCm", 170.0),
+                                weightKg = obj.optDouble("weightKg", 70.0)
                             )
                         )
                     }
