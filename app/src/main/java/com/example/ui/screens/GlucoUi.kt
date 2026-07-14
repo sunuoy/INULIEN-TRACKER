@@ -4387,19 +4387,19 @@ fun ReminderCard(
                 }
                 
                 Column(modifier = Modifier.weight(1f).padding(16.dp)) {
-                    // Top section: Left Info details & Right Time/Switch details
+                    // Row 1: Left Type Icon + Time, Right Switch + Expand Indicator
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Row(
-                            modifier = Modifier.weight(1f),
-                            verticalAlignment = Alignment.CenterVertically
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
                             Box(
                                 modifier = Modifier
-                                    .size(42.dp)
+                                    .size(32.dp)
                                     .background(
                                         if (target.isEnabled) {
                                             if (target.reminderType == "Insulin") MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.tertiaryContainer
@@ -4412,65 +4412,27 @@ fun ReminderCard(
                             ) {
                                 Icon(
                                     imageVector = if (target.reminderType == "Insulin") Icons.Default.Vaccines else Icons.Default.WaterDrop,
-                                    contentDescription = "Alert type",
                                     tint = if (target.isEnabled) {
                                         if (target.reminderType == "Insulin") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.tertiary
                                     } else {
                                         MaterialTheme.colorScheme.outline
                                     },
-                                    modifier = Modifier.size(20.dp)
+                                    contentDescription = "Alert type icon",
+                                    modifier = Modifier.size(16.dp)
                                 )
                             }
-
-                            Spacer(modifier = Modifier.width(12.dp))
-
-                            Column(modifier = Modifier.padding(end = 8.dp)) {
-                                Text(
-                                    text = target.label,
-                                    fontWeight = FontWeight.Bold,
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    color = if (target.isEnabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                                )
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Box(
-                                        modifier = Modifier
-                                            .background(MaterialTheme.colorScheme.outline.copy(0.12f), RoundedCornerShape(4.dp))
-                                            .padding(horizontal = 6.dp, vertical = 1.dp)
-                                    ) {
-                                        Text(target.reminderType, fontSize = 9.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.outline)
-                                    }
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Box(
-                                        modifier = Modifier
-                                            .background(MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
-                                            .padding(horizontal = 6.dp, vertical = 1.dp)
-                                    ) {
-                                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-                                            Icon(
-                                                imageVector = Icons.Default.VolumeUp,
-                                                contentDescription = null,
-                                                modifier = Modifier.size(10.dp),
-                                                tint = MaterialTheme.colorScheme.onSecondaryContainer
-                                            )
-                                            Text(target.tone, fontSize = 9.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSecondaryContainer)
-                                        }
-                                    }
-                                }
-                            }
+                            Text(
+                                text = viewModel.formatHourMinute(target.hour, target.minute),
+                                style = MaterialTheme.typography.headlineSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = if (target.isEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
+                            )
                         }
 
-                        // Right side: Time display, Switch toggle, and Expand Indicator
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Text(
-                                text = viewModel.formatHourMinute(target.hour, target.minute),
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = if (target.isEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
-                            )
                             Switch(
                                 checked = target.isEnabled,
                                 onCheckedChange = { onToggle() },
@@ -4488,54 +4450,103 @@ fun ReminderCard(
                         }
                     }
 
-                    // Weekdays Circular Pills layout
-                    Spacer(modifier = Modifier.height(10.dp))
-                    val parsedDays = remember(target.daysOfWeek) {
-                        val lower = target.daysOfWeek.lowercase()
-                        if (lower == "daily" || lower == "every day") {
-                            listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
-                        } else {
-                            target.daysOfWeek.split(",").map { it.trim() }
-                        }
-                    }
-                    val allDays = listOf(
-                        Pair("M", "Mon"),
-                        Pair("T", "Tue"),
-                        Pair("W", "Wed"),
-                        Pair("T", "Thu"),
-                        Pair("F", "Fri"),
-                        Pair("S", "Sat"),
-                        Pair("S", "Sun")
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Row 2: Title / Label (single line)
+                    Text(
+                        text = target.label,
+                        fontWeight = FontWeight.SemiBold,
+                        style = MaterialTheme.typography.bodyLarge,
+                        maxLines = 1,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                        color = if (target.isEnabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                     )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Row 3: Category Chips & Weekdays starting with Sunday (S, M, T, W, T, F, S)
                     Row(
-                        horizontalArrangement = Arrangement.spacedBy(5.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        allDays.forEach { (letter, dayName) ->
-                            val isActive = parsedDays.any { it.startsWith(dayName, ignoreCase = true) }
+                        // Chips Row
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
                             Box(
                                 modifier = Modifier
-                                    .size(20.dp)
-                                    .background(
-                                        if (isActive && target.isEnabled) {
-                                            if (target.reminderType == "Insulin") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.tertiary
-                                        } else {
-                                            MaterialTheme.colorScheme.outline.copy(alpha = 0.12f)
-                                        },
-                                        CircleShape
-                                    ),
-                                contentAlignment = Alignment.Center
+                                    .background(MaterialTheme.colorScheme.outline.copy(0.12f), RoundedCornerShape(4.dp))
+                                    .padding(horizontal = 6.dp, vertical = 1.dp)
                             ) {
-                                Text(
-                                    text = letter,
-                                    fontSize = 8.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = if (isActive && target.isEnabled) {
-                                        if (target.reminderType == "Insulin") MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onTertiary
-                                    } else {
-                                        MaterialTheme.colorScheme.outline
-                                    }
-                                )
+                                Text(target.reminderType, fontSize = 9.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.outline)
+                            }
+                            Box(
+                                modifier = Modifier
+                                    .background(MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
+                                    .padding(horizontal = 6.dp, vertical = 1.dp)
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                                    Icon(
+                                        imageVector = Icons.Default.VolumeUp,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(10.dp),
+                                        tint = MaterialTheme.colorScheme.onSecondaryContainer
+                                    )
+                                    Text(target.tone, fontSize = 9.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSecondaryContainer)
+                                }
+                            }
+                        }
+
+                        // Weekdays Row (S, M, T, W, T, F, S)
+                        val parsedDays = remember(target.daysOfWeek) {
+                            val lower = target.daysOfWeek.lowercase()
+                            if (lower == "daily" || lower == "every day") {
+                                listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+                            } else {
+                                target.daysOfWeek.split(",").map { it.trim() }
+                            }
+                        }
+                        val allDays = listOf(
+                            Pair("S", "Sun"),
+                            Pair("M", "Mon"),
+                            Pair("T", "Tue"),
+                            Pair("W", "Wed"),
+                            Pair("T", "Thu"),
+                            Pair("F", "Fri"),
+                            Pair("S", "Sat")
+                        )
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            allDays.forEach { (letter, dayName) ->
+                                val isActive = parsedDays.any { it.startsWith(dayName, ignoreCase = true) }
+                                Box(
+                                    modifier = Modifier
+                                        .size(18.dp)
+                                        .background(
+                                            if (isActive && target.isEnabled) {
+                                                if (target.reminderType == "Insulin") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.tertiary
+                                            } else {
+                                                MaterialTheme.colorScheme.outline.copy(alpha = 0.12f)
+                                            },
+                                            CircleShape
+                                        ),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = letter,
+                                        fontSize = 8.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isActive && target.isEnabled) {
+                                            if (target.reminderType == "Insulin") MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onTertiary
+                                        } else {
+                                            MaterialTheme.colorScheme.outline
+                                        }
+                                    )
+                                }
                             }
                         }
                     }
