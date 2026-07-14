@@ -480,8 +480,16 @@ fun GlucoAppLayout(viewModel: GlucoViewModel) {
     }
 
     if (isLoggedIn && isUpdateAvailable && latestVersion != null) {
+        val isDownloading by viewModel.isDownloading.collectAsState()
+        val dlProgress by viewModel.downloadProgress.collectAsState()
+        val dlStatus by viewModel.downloadStatus.collectAsState()
+
         AlertDialog(
-            onDismissRequest = { viewModel.dismissUpdateDialog() },
+            onDismissRequest = { 
+                if (!isDownloading) {
+                    viewModel.dismissUpdateDialog() 
+                }
+            },
             title = {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
@@ -492,69 +500,100 @@ fun GlucoAppLayout(viewModel: GlucoViewModel) {
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "New Update Available!",
+                        text = if (isDownloading) "Downloading Update..." else "New Update Available!",
                         fontWeight = FontWeight.Bold
                     )
                 }
             },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
-                        text = "A newer version of GlucoLog Tracker is available.",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
+                    if (isDownloading) {
+                        Text(
+                            text = dlStatus ?: "Downloading...",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        LinearProgressIndicator(
+                            progress = dlProgress,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(8.dp)
+                                .clip(RoundedCornerShape(4.dp)),
+                            color = MaterialTheme.colorScheme.primary,
+                            trackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "${(dlProgress * 100).toInt()}% completed",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.outline,
+                            modifier = Modifier.align(Alignment.End)
+                        )
+                    } else {
+                        Text(
+                            text = "A newer version of GlucoLog Tracker is available.",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
 
-                    Surface(
-                        color = MaterialTheme.colorScheme.primaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                        shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Column(modifier = Modifier.padding(10.dp)) {
+                        Surface(
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(10.dp)) {
+                                Text(
+                                    text = "Latest Release: $latestVersion",
+                                    fontWeight = FontWeight.Bold,
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                                Text(
+                                    text = changeCategory,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                        }
+
+                        if (!releaseNotes.isNullOrEmpty()) {
                             Text(
-                                text = "Latest Release: $latestVersion",
+                                text = "What's New:",
                                 fontWeight = FontWeight.Bold,
-                                style = MaterialTheme.typography.bodyMedium
+                                style = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier.padding(top = 4.dp)
                             )
                             Text(
-                                text = changeCategory,
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.SemiBold
+                                text = releaseNotes!!,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
-                    }
-
-                    if (!releaseNotes.isNullOrEmpty()) {
-                        Text(
-                            text = "What's New:",
-                            fontWeight = FontWeight.Bold,
-                            style = MaterialTheme.typography.bodySmall,
-                            modifier = Modifier.padding(top = 4.dp)
-                        )
-                        Text(
-                            text = releaseNotes!!,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
                     }
                 }
             },
             confirmButton = {
-                Button(
-                    onClick = {
-                        latestApkUrl?.let { uriHandler.openUri(it) }
-                        viewModel.dismissUpdateDialog()
-                    },
-                    shape = RoundedCornerShape(8.dp)
-                ) {
-                    Text("Update Now")
+                if (!isDownloading) {
+                    Button(
+                        onClick = {
+                            latestApkUrl?.let {
+                                viewModel.downloadAndInstallApk(it)
+                            }
+                        },
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Text("Update Now")
+                    }
                 }
             },
             dismissButton = {
-                TextButton(
-                    onClick = { viewModel.dismissUpdateDialog() }
-                ) {
-                    Text("Later")
+                if (!isDownloading) {
+                    TextButton(
+                        onClick = { viewModel.dismissUpdateDialog() }
+                    ) {
+                        Text("Later")
+                    }
                 }
             },
             shape = RoundedCornerShape(16.dp)
