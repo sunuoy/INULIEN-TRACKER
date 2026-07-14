@@ -925,7 +925,7 @@ class GlucoViewModel(application: Application) : AndroidViewModel(application) {
                         }
                     }
 
-                    val finalApkUrl = apkUrl ?: json.optString("html_url", "")
+                    val finalApkUrl = apkUrl ?: "https://github.com/sunuoy/INSULIN-TRACKER/releases/download/$tagName/INSULIN-TRACKER_${tagName.replace("v", "")}-release.apk"
 
                     withContext(Dispatchers.Main) {
                         _latestReleaseVersion.value = tagName
@@ -1028,10 +1028,10 @@ class GlucoViewModel(application: Application) : AndroidViewModel(application) {
                 }
 
                 val output = java.io.FileOutputStream(updateFile)
-                val data = ByteArray(4096)
+                val buffer = ByteArray(4096)
                 var total: Long = 0
                 var count: Int
-                while (input.read(data).also { count = it } != -1) {
+                while (input.read(buffer).also { count = it } != -1) {
                     total += count
                     if (fileLength > 0) {
                         val progress = total.toFloat() / fileLength
@@ -1042,7 +1042,7 @@ class GlucoViewModel(application: Application) : AndroidViewModel(application) {
                             _downloadStatus.value = "Downloading... $mbDown / $mbTotal MB"
                         }
                     }
-                    output.write(data, 0, count)
+                    output.write(buffer, 0, count)
                 }
 
                 output.flush()
@@ -1051,7 +1051,26 @@ class GlucoViewModel(application: Application) : AndroidViewModel(application) {
 
                 withContext(Dispatchers.Main) {
                     _downloadProgress.value = 1f
-                    _downloadStatus.value = "Download complete. Installing..."
+                    _downloadStatus.value = "Download complete. Checking permissions..."
+                }
+
+                // Check for ACTION_MANAGE_UNKNOWN_APP_SOURCES on Oreo+ (Android 8.0 / API 26+)
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                    if (!context.packageManager.canRequestPackageInstalls()) {
+                        val settingsIntent = android.content.Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
+                            data = android.net.Uri.parse("package:" + context.packageName)
+                            flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK
+                        }
+                        withContext(Dispatchers.Main) {
+                            try {
+                                context.startActivity(settingsIntent)
+                                _downloadStatus.value = "Please enable 'Install unknown apps' permission"
+                            } catch (e: Exception) {
+                                _downloadStatus.value = "Could not open settings: ${e.message}"
+                            }
+                        }
+                        return@launch
+                    }
                 }
 
                 val contentUri = androidx.core.content.FileProvider.getUriForFile(
