@@ -13,7 +13,7 @@
     <!--   1. OCEAN DEPTH  |  Dark · Finance · Analytics · Dashboard  -->
     <!-- ============================================================ -->
     <color name="ocean_depth_background">#0D1B2A</color>
-    <color name="ocean_depth_surface">#EAE8E0</color>
+    <color name="ocean_depth_surface">#1B2A3B</color>
     <color name="ocean_depth_card">#243447</color>
     <color name="ocean_depth_primary">#3B9EFF</color>
     <color name="ocean_depth_accent">#00D4AA</color>
