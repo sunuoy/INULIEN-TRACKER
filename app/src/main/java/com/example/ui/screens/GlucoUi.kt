@@ -1216,63 +1216,68 @@ fun LoginScreen(viewModel: GlucoViewModel) {
                 }
 
                 // OR Divider for third party options
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Divider(modifier = Modifier.weight(1f), thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
-                    Text(
-                        text = "Or continue with",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.outline,
-                        fontWeight = FontWeight.Medium
-                    )
-                    Divider(modifier = Modifier.weight(1f), thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
-                }
-
-                // Sign in with Google Button
-                OutlinedButton(
-                    onClick = {
-                        try {
-                            val intent = android.accounts.AccountManager.newChooseAccountIntent(
-                                null,
-                                null,
-                                arrayOf("com.google"),
-                                null,
-                                null,
-                                null,
-                                null
-                            )
-                            googleAccountPickerLauncher.launch(intent)
-                        } catch (e: Exception) {
-                            android.util.Log.e("GoogleSignIn", "Failed to launch native account picker: ${e.message}", e)
-                            prefilledGoogleEmail = ""
-                            prefilledGoogleName = ""
-                            prefilledGoogleUsername = ""
-                            showGoogleSignInDialog = true
-                        }
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(50.dp)
-                        .testTag("google_login_button"),
-                    shape = RoundedCornerShape(12.dp),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                    colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.surface)
-                ) {
+                if (isRegisterMode) {
+                    Spacer(modifier = Modifier.height(6.dp))
                     Row(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        GoogleLogoIcon(modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(10.dp))
+                        Divider(modifier = Modifier.weight(1f), thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
                         Text(
-                            text = "Sign in with Google",
-                            color = MaterialTheme.colorScheme.onSurface,
-                            fontWeight = FontWeight.Bold,
-                            style = MaterialTheme.typography.bodyMedium
+                            text = "Or register with",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.outline,
+                            fontWeight = FontWeight.Medium
                         )
+                        Divider(modifier = Modifier.weight(1f), thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
+                    }
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    // Sign up with Google Button
+                    OutlinedButton(
+                        onClick = {
+                            try {
+                                val intent = android.accounts.AccountManager.newChooseAccountIntent(
+                                    null,
+                                    null,
+                                    arrayOf("com.google"),
+                                    null,
+                                    null,
+                                    null,
+                                    null
+                                )
+                                googleAccountPickerLauncher.launch(intent)
+                            } catch (e: Exception) {
+                                android.util.Log.e("GoogleSignUp", "Failed to launch native account picker: ${e.message}", e)
+                                prefilledGoogleEmail = ""
+                                prefilledGoogleName = ""
+                                prefilledGoogleUsername = ""
+                                showGoogleSignInDialog = true
+                            }
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(50.dp)
+                            .testTag("google_signup_button"),
+                        shape = RoundedCornerShape(12.dp),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                        colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.surface)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            GoogleLogoIcon(modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text(
+                                text = "Sign up with Google",
+                                color = MaterialTheme.colorScheme.onSurface,
+                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        }
                     }
                 }
 
@@ -1453,13 +1458,13 @@ fun GoogleSignInDialog(
 
                 if (step == 1) {
                     Text(
-                        text = "Sign in with Google",
+                        text = "Sign up with Google",
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
                         textAlign = TextAlign.Center
                     )
                     Text(
-                        text = "Input your Google profile details to securely connect this clinical session.",
+                        text = "Input your Google profile details to register and securely connect this clinical session.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.outline,
                         textAlign = TextAlign.Center
