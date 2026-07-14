@@ -2335,6 +2335,27 @@ fun HomeScreen(
                             cornerRadius = androidx.compose.ui.geometry.CornerRadius(h / 2f, h / 2f)
                         )
                         
+                        // Hazard warning stripes when cartridge is critically low
+                        if (percent < 0.20) {
+                            val stripeWidth = 12f
+                            var startX = 0f
+                            while (startX < w) {
+                                drawLine(
+                                    color = Color(0xFFEF4444).copy(alpha = 0.35f),
+                                    start = Offset(startX, h),
+                                    end = Offset(startX + stripeWidth, 0f),
+                                    strokeWidth = 5f
+                                )
+                                drawLine(
+                                    color = Color(0xFFFBBF24).copy(alpha = 0.35f),
+                                    start = Offset(startX + stripeWidth, h),
+                                    end = Offset(startX + stripeWidth * 2f, 0f),
+                                    strokeWidth = 5f
+                                )
+                                startX += stripeWidth * 2f
+                            }
+                        }
+                        
                         // 2. Draw liquid inside (if percent > 0)
                         if (percent > 0.0) {
                             val liquidWidth = w * percent.toFloat()
@@ -2366,9 +2387,10 @@ fun HomeScreen(
                             cornerRadius = androidx.compose.ui.geometry.CornerRadius(h / 2f, h / 2f)
                         )
                         
-                        // 4. Draw outer glass tube border
+                        // 4. Draw outer glass tube border (pulsing warning outline when low)
+                        val borderCol = if (percent < 0.20) Color(0xFFEF4444) else Color.LightGray.copy(alpha = 0.5f)
                         drawRoundRect(
-                            color = Color.LightGray.copy(alpha = 0.5f),
+                            color = borderCol,
                             topLeft = Offset(0f, 0f),
                             size = Size(w, h),
                             cornerRadius = androidx.compose.ui.geometry.CornerRadius(h / 2f, h / 2f),
