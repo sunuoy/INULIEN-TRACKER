@@ -7718,8 +7718,8 @@ fun StepsScreen(
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.15f))
                 ) {
                     Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 12.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         Text(
                             text = "Today's Progress",
@@ -7741,7 +7741,7 @@ fun StepsScreen(
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                            verticalAlignment = Alignment.Top
                         ) {
                             // Left Column: Progress Ring
                             Column(
@@ -7817,135 +7817,212 @@ fun StepsScreen(
                                 modifier = Modifier.weight(1.0f),
                                 verticalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
-                                // Height & Weight side by side in a Row
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    // Height Display
-                                    Card(
-                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.6f)),
-                                        shape = RoundedCornerShape(10.dp),
-                                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)),
-                                        modifier = Modifier.weight(1f)
-                                    ) {
-                                        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp)) {
-                                            Text("Height", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline, fontSize = 9.sp)
-                                            Text("${currentProfile.heightCm} cm", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
-                                        }
-                                    }
+                                 // Height & Weight side by side in a Row
+                                 Row(
+                                     modifier = Modifier.fillMaxWidth(),
+                                     horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                 ) {
+                                     // Height Display
+                                     Card(
+                                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f)),
+                                         shape = RoundedCornerShape(14.dp),
+                                         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
+                                         modifier = Modifier.weight(1f)
+                                     ) {
+                                         Column(modifier = Modifier.fillMaxWidth().padding(12.dp)) {
+                                             Row(
+                                                 modifier = Modifier.fillMaxWidth(),
+                                                 horizontalArrangement = Arrangement.SpaceBetween,
+                                                 verticalAlignment = Alignment.CenterVertically
+                                             ) {
+                                                 Text(
+                                                     text = "Height",
+                                                     style = MaterialTheme.typography.labelMedium,
+                                                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                                     fontWeight = FontWeight.Medium
+                                                 )
+                                                 Icon(
+                                                     imageVector = Icons.Default.Straighten,
+                                                     contentDescription = null,
+                                                     tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
+                                                     modifier = Modifier.size(16.dp)
+                                                 )
+                                             }
+                                             Spacer(modifier = Modifier.height(6.dp))
+                                             Text(
+                                                 text = "${currentProfile.heightCm} cm",
+                                                 style = MaterialTheme.typography.titleMedium,
+                                                 fontWeight = FontWeight.Bold,
+                                                 color = MaterialTheme.colorScheme.onSurface
+                                             )
+                                         }
+                                     }
 
-                                    // Weight Display
-                                    Card(
-                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.6f)),
-                                        shape = RoundedCornerShape(10.dp),
-                                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)),
-                                        modifier = Modifier.weight(1f)
-                                    ) {
-                                        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp)) {
-                                            Text("Weight", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline, fontSize = 9.sp)
-                                            Text("${currentProfile.weightKg} kg", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
-                                        }
-                                    }
-                                }
+                                     // Weight Display
+                                     Card(
+                                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f)),
+                                         shape = RoundedCornerShape(14.dp),
+                                         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
+                                         modifier = Modifier.weight(1f)
+                                     ) {
+                                         Column(modifier = Modifier.fillMaxWidth().padding(12.dp)) {
+                                             Row(
+                                                 modifier = Modifier.fillMaxWidth(),
+                                                 horizontalArrangement = Arrangement.SpaceBetween,
+                                                 verticalAlignment = Alignment.CenterVertically
+                                             ) {
+                                                 Text(
+                                                     text = "Weight",
+                                                     style = MaterialTheme.typography.labelMedium,
+                                                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                                     fontWeight = FontWeight.Medium
+                                                 )
+                                                 Icon(
+                                                     imageVector = Icons.Default.Speed,
+                                                     contentDescription = null,
+                                                     tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
+                                                     modifier = Modifier.size(16.dp)
+                                                 )
+                                             }
+                                             Spacer(modifier = Modifier.height(6.dp))
+                                             Text(
+                                                 text = "${currentProfile.weightKg} kg",
+                                                 style = MaterialTheme.typography.titleMedium,
+                                                 fontWeight = FontWeight.Bold,
+                                                 color = MaterialTheme.colorScheme.onSurface
+                                             )
+                                         }
+                                     }
+                                 }
 
-                                // BMI Display on the next line
-                                Card(
-                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.6f)),
-                                    shape = RoundedCornerShape(12.dp),
-                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)),
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Column(
-                                        modifier = Modifier.fillMaxWidth().padding(10.dp),
-                                        verticalArrangement = Arrangement.spacedBy(6.dp)
-                                    ) {
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Column {
-                                                Text("BMI Indicator", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline, fontSize = 9.sp)
-                                                Text(
-                                                    text = if (bmi > 0) String.format("%.1f", bmi) else "N/A",
-                                                    style = MaterialTheme.typography.bodyMedium,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = bmiColor
-                                                )
-                                            }
-                                            Box(
-                                                modifier = Modifier
-                                                    .background(bmiColor.copy(alpha = 0.15f), RoundedCornerShape(4.dp))
-                                                    .padding(horizontal = 6.dp, vertical = 3.dp)
-                                            ) {
-                                                Text(
-                                                    text = bmiCategory,
-                                                    color = bmiColor,
-                                                    fontWeight = FontWeight.Black,
-                                                    fontSize = 8.sp
-                                                )
-                                            }
-                                        }
+                                 // BMI Display on the next line
+                                 Card(
+                                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f)),
+                                     shape = RoundedCornerShape(16.dp),
+                                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
+                                     modifier = Modifier.fillMaxWidth()
+                                 ) {
+                                     Column(
+                                         modifier = Modifier.fillMaxWidth().padding(14.dp),
+                                         verticalArrangement = Arrangement.spacedBy(8.dp)
+                                     ) {
+                                         Row(
+                                             modifier = Modifier.fillMaxWidth(),
+                                             horizontalArrangement = Arrangement.SpaceBetween,
+                                             verticalAlignment = Alignment.CenterVertically
+                                         ) {
+                                             Column {
+                                                 Text(
+                                                     text = "BMI Index",
+                                                     style = MaterialTheme.typography.labelMedium,
+                                                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                                     fontWeight = FontWeight.Medium
+                                                 )
+                                                 Spacer(modifier = Modifier.height(2.dp))
+                                                 Text(
+                                                     text = if (bmi > 0) String.format("%.1f", bmi) else "N/A",
+                                                     style = MaterialTheme.typography.titleLarge,
+                                                     fontWeight = FontWeight.ExtraBold,
+                                                     color = bmiColor
+                                                 )
+                                             }
+                                             Box(
+                                                 modifier = Modifier
+                                                     .background(bmiColor.copy(alpha = 0.12f), RoundedCornerShape(8.dp))
+                                                     .border(1.dp, bmiColor.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
+                                                     .padding(horizontal = 10.dp, vertical = 5.dp)
+                                             ) {
+                                                 Text(
+                                                     text = bmiCategory,
+                                                     color = bmiColor,
+                                                     fontWeight = FontWeight.Bold,
+                                                     style = MaterialTheme.typography.labelSmall
+                                                 )
+                                             }
+                                         }
 
-                                        // BMI Graphical Indicator Bar
-                                        if (bmi > 0) {
-                                            androidx.compose.foundation.Canvas(
-                                                modifier = Modifier.fillMaxWidth().height(12.dp)
-                                            ) {
-                                                val trackHeight = 4.dp.toPx()
-                                                val yCenter = size.height / 2f
-                                                
-                                                val w1 = size.width * 0.175f // Underweight (15 to 18.5)
-                                                val w2 = size.width * 0.325f // Normal (18.5 to 25.0)
-                                                val w3 = size.width * 0.25f  // Overweight (25.0 to 30.0)
-                                                val w4 = size.width * 0.25f  // Obese (30.0 to 35.0)
+                                         // BMI Graphical Indicator Bar
+                                         if (bmi > 0) {
+                                             androidx.compose.foundation.Canvas(
+                                                 modifier = Modifier.fillMaxWidth().height(16.dp)
+                                             ) {
+                                                 val trackHeight = 6.dp.toPx()
+                                                 val yCenter = size.height / 2f
+                                                 val segmentSpacing = 3.dp.toPx()
+                                                 
+                                                 val totalWidth = size.width
+                                                 val usableWidth = totalWidth - (3 * segmentSpacing)
+                                                 val w1 = usableWidth * 0.175f // Underweight (15 to 18.5)
+                                                 val w2 = usableWidth * 0.325f // Normal (18.5 to 25.0)
+                                                 val w3 = usableWidth * 0.25f  // Overweight (25.0 to 30.0)
+                                                 val w4 = usableWidth * 0.25f  // Obese (30.0 to 35.0)
 
-                                                // Draw track segments
-                                                drawRoundRect(
-                                                    color = Color(0xFFFBC02D),
-                                                    topLeft = androidx.compose.ui.geometry.Offset(0f, yCenter - trackHeight/2),
-                                                    size = androidx.compose.ui.geometry.Size(w1 - 2.dp.toPx(), trackHeight),
-                                                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(2.dp.toPx(), 2.dp.toPx())
-                                                )
-                                                drawRoundRect(
-                                                    color = Color(0xFF4CAF50),
-                                                    topLeft = androidx.compose.ui.geometry.Offset(w1, yCenter - trackHeight/2),
-                                                    size = androidx.compose.ui.geometry.Size(w2 - 2.dp.toPx(), trackHeight),
-                                                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(2.dp.toPx(), 2.dp.toPx())
-                                                )
-                                                drawRoundRect(
-                                                    color = Color(0xFFF57C00),
-                                                    topLeft = androidx.compose.ui.geometry.Offset(w1 + w2, yCenter - trackHeight/2),
-                                                    size = androidx.compose.ui.geometry.Size(w3 - 2.dp.toPx(), trackHeight),
-                                                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(2.dp.toPx(), 2.dp.toPx())
-                                                )
-                                                drawRoundRect(
-                                                    color = Color(0xFFD32F2F),
-                                                    topLeft = androidx.compose.ui.geometry.Offset(w1 + w2 + w3, yCenter - trackHeight/2),
-                                                    size = androidx.compose.ui.geometry.Size(w4, trackHeight),
-                                                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(2.dp.toPx(), 2.dp.toPx())
-                                                )
+                                                 // Draw track segments
+                                                 drawRoundRect(
+                                                     color = Color(0xFFFBC02D),
+                                                     topLeft = androidx.compose.ui.geometry.Offset(0f, yCenter - trackHeight/2),
+                                                     size = androidx.compose.ui.geometry.Size(w1, trackHeight),
+                                                     cornerRadius = androidx.compose.ui.geometry.CornerRadius(3.dp.toPx(), 3.dp.toPx())
+                                                 )
+                                                 drawRoundRect(
+                                                     color = Color(0xFF4CAF50),
+                                                     topLeft = androidx.compose.ui.geometry.Offset(w1 + segmentSpacing, yCenter - trackHeight/2),
+                                                     size = androidx.compose.ui.geometry.Size(w2, trackHeight),
+                                                     cornerRadius = androidx.compose.ui.geometry.CornerRadius(3.dp.toPx(), 3.dp.toPx())
+                                                 )
+                                                 drawRoundRect(
+                                                     color = Color(0xFFF57C00),
+                                                     topLeft = androidx.compose.ui.geometry.Offset(w1 + w2 + 2 * segmentSpacing, yCenter - trackHeight/2),
+                                                     size = androidx.compose.ui.geometry.Size(w3, trackHeight),
+                                                     cornerRadius = androidx.compose.ui.geometry.CornerRadius(3.dp.toPx(), 3.dp.toPx())
+                                                 )
+                                                 drawRoundRect(
+                                                     color = Color(0xFFD32F2F),
+                                                     topLeft = androidx.compose.ui.geometry.Offset(w1 + w2 + w3 + 3 * segmentSpacing, yCenter - trackHeight/2),
+                                                     size = androidx.compose.ui.geometry.Size(w4, trackHeight),
+                                                     cornerRadius = androidx.compose.ui.geometry.CornerRadius(3.dp.toPx(), 3.dp.toPx())
+                                                 )
 
-                                                // Pointer marker
-                                                val bmiClamped = bmi.toFloat().coerceIn(15f, 35f)
-                                                val pct = (bmiClamped - 15f) / (35f - 15f)
-                                                val pointerX = size.width * pct
+                                                 // Pointer marker
+                                                 val bmiClamped = bmi.toFloat().coerceIn(15f, 35f)
+                                                 val pct = (bmiClamped - 15f) / (35f - 15f)
+                                                 
+                                                 // Map the percentage correctly across the segments and gaps
+                                                 val pointerX = when {
+                                                     pct <= 0.175f -> {
+                                                         val subPct = pct / 0.175f
+                                                         subPct * w1
+                                                     }
+                                                     pct <= 0.500f -> {
+                                                         val subPct = (pct - 0.175f) / 0.325f
+                                                         w1 + segmentSpacing + (subPct * w2)
+                                                     }
+                                                     pct <= 0.750f -> {
+                                                         val subPct = (pct - 0.500f) / 0.25f
+                                                         w1 + w2 + 2 * segmentSpacing + (subPct * w3)
+                                                     }
+                                                     else -> {
+                                                         val subPct = (pct - 0.750f) / 0.25f
+                                                         w1 + w2 + w3 + 3 * segmentSpacing + (subPct * w4)
+                                                     }
+                                                 }
 
-                                                drawCircle(
-                                                    color = Color.White,
-                                                    radius = 5.dp.toPx(),
-                                                    center = androidx.compose.ui.geometry.Offset(pointerX, yCenter)
-                                                )
-                                                drawCircle(
-                                                    color = bmiColor,
-                                                    radius = 3.dp.toPx(),
-                                                    center = androidx.compose.ui.geometry.Offset(pointerX, yCenter)
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
+                                                 // Outer ring
+                                                 drawCircle(
+                                                     color = Color.White,
+                                                     radius = 7.dp.toPx(),
+                                                     center = androidx.compose.ui.geometry.Offset(pointerX, yCenter)
+                                                 )
+                                                 // Inner color dot
+                                                 drawCircle(
+                                                     color = bmiColor,
+                                                     radius = 4.5f.dp.toPx(),
+                                                     center = androidx.compose.ui.geometry.Offset(pointerX, yCenter)
+                                                 )
+                                             }
+                                         }
+                                     }
+                                 }
                             }
                         }
                     }
@@ -7960,37 +8037,145 @@ fun StepsScreen(
                 ) {
                     // Distance
                     val estKm = todaySteps * 0.00075
+                    val kmGoal = 5.0
+                    val kmProgress = (estKm / kmGoal).coerceIn(0.0, 1.0).toFloat()
+                    val secondaryColor = MaterialTheme.colorScheme.secondary
+                    val secondaryTrackColor = secondaryColor.copy(alpha = 0.15f)
                     Card(
                         modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.2f))
+                        shape = RoundedCornerShape(14.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f)),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
                     ) {
                         Column(
                             modifier = Modifier.padding(12.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
+                            horizontalAlignment = Alignment.Start
                         ) {
-                            Icon(Icons.Default.DirectionsRun, contentDescription = null, tint = MaterialTheme.colorScheme.secondary)
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "Distance",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                    fontWeight = FontWeight.Medium
+                                )
+                                Icon(
+                                    imageVector = Icons.Default.DirectionsRun,
+                                    contentDescription = null,
+                                    tint = secondaryColor,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
                             Spacer(modifier = Modifier.height(4.dp))
-                            Text("Distance", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
-                            Text(String.format("%.2f km", estKm), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                            Text(
+                                text = String.format("%.2f km", estKm),
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Spacer(modifier = Modifier.height(10.dp))
+                            
+                            // Graphic progress line
+                            androidx.compose.foundation.Canvas(
+                                modifier = Modifier.fillMaxWidth().height(4.dp)
+                            ) {
+                                val trackHeight = size.height
+                                val yCenter = size.height / 2f
+                                drawRoundRect(
+                                    color = secondaryTrackColor,
+                                    topLeft = Offset(0f, yCenter - trackHeight/2),
+                                    size = Size(size.width, trackHeight),
+                                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(2.dp.toPx(), 2.dp.toPx())
+                                )
+                                drawRoundRect(
+                                    color = secondaryColor,
+                                    topLeft = Offset(0f, yCenter - trackHeight/2),
+                                    size = Size(size.width * kmProgress, trackHeight),
+                                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(2.dp.toPx(), 2.dp.toPx())
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "${(kmProgress * 100).toInt()}% of 5 km",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.outline,
+                                fontSize = 9.sp
+                            )
                         }
                     }
 
                     // Calories
                     val estKcal = todaySteps * 0.04
+                    val kcalGoal = 400.0
+                    val kcalProgress = (estKcal / kcalGoal).coerceIn(0.0, 1.0).toFloat()
+                    val tertiaryColor = MaterialTheme.colorScheme.tertiary
+                    val tertiaryTrackColor = tertiaryColor.copy(alpha = 0.15f)
                     Card(
                         modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.2f))
+                        shape = RoundedCornerShape(14.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f)),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
                     ) {
                         Column(
                             modifier = Modifier.padding(12.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
+                            horizontalAlignment = Alignment.Start
                         ) {
-                            Icon(Icons.Default.Favorite, contentDescription = null, tint = MaterialTheme.colorScheme.tertiary)
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "Calories",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                    fontWeight = FontWeight.Medium
+                                )
+                                Icon(
+                                    imageVector = Icons.Default.Favorite,
+                                    contentDescription = null,
+                                    tint = tertiaryColor,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
                             Spacer(modifier = Modifier.height(4.dp))
-                            Text("Calories", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
-                            Text(String.format("%.0f kcal", estKcal), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                            Text(
+                                text = String.format("%.0f kcal", estKcal),
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Spacer(modifier = Modifier.height(10.dp))
+                            
+                            // Graphic progress line
+                            androidx.compose.foundation.Canvas(
+                                modifier = Modifier.fillMaxWidth().height(4.dp)
+                            ) {
+                                val trackHeight = size.height
+                                val yCenter = size.height / 2f
+                                drawRoundRect(
+                                    color = tertiaryTrackColor,
+                                    topLeft = Offset(0f, yCenter - trackHeight/2),
+                                    size = Size(size.width, trackHeight),
+                                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(2.dp.toPx(), 2.dp.toPx())
+                                )
+                                drawRoundRect(
+                                    color = tertiaryColor,
+                                    topLeft = Offset(0f, yCenter - trackHeight/2),
+                                    size = Size(size.width * kcalProgress, trackHeight),
+                                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(2.dp.toPx(), 2.dp.toPx())
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "${(kcalProgress * 100).toInt()}% of 400 kcal",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.outline,
+                                fontSize = 9.sp
+                            )
                         }
                     }
                 }

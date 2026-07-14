@@ -30,7 +30,13 @@ class StepCounterService : Service(), SensorEventListener {
 
     private lateinit var sensorManager: SensorManager
     private var stepSensor: Sensor? = null
+    private var accelSensor: Sensor? = null
     private lateinit var database: AppDatabase
+
+    private var lastStepTimeNs: Long = 0
+    private var magnitudePrevious: Float = 0f
+    private val STEP_THRESHOLD = 12.0f // acceleration magnitude threshold in m/s^2
+    private val STEP_DELAY_NS = 350000000L // 350ms lockout between steps
 
     private val CHANNEL_ID = "step_tracker_channel"
     private val NOTIFICATION_ID = 888
@@ -41,6 +47,7 @@ class StepCounterService : Service(), SensorEventListener {
 
         sensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
         stepSensor = sensorManager.getDefaultSensor(Sensor.TYPE_STEP_COUNTER)
+        accelSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
         database = AppDatabase.getDatabase(applicationContext)
 
         createNotificationChannel()
@@ -49,8 +56,11 @@ class StepCounterService : Service(), SensorEventListener {
         if (stepSensor != null) {
             sensorManager.registerListener(this, stepSensor, SensorManager.SENSOR_DELAY_UI)
             Log.d("StepCounterService", "Step sensor registered successfully")
+        } else if (accelSensor != null) {
+            sensorManager.registerListener(this, accelSensor, SensorManager.SENSOR_DELAY_UI)
+            Log.d("StepCounterService", "Step sensor missing, registered Accelerometer instead for movement step counting")
         } else {
-            Log.e("StepCounterService", "No step counter sensor found on this device")
+            Log.e("StepCounterService", "No step counter or accelerometer sensor found on this device")
         }
     }
 
@@ -63,17 +73,61 @@ class StepCounterService : Service(), SensorEventListener {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onSensorChanged(event: SensorEvent?) {
-        if (event == null || event.sensor.type != Sensor.TYPE_STEP_COUNTER) return
+        if (event == null) return
 
-        val currentSensorSteps = event.values[0].toInt()
-        Log.d("StepCounterService", "Sensor steps reading: $currentSensorSteps")
+        if (event.sensor.type == Sensor.TYPE_STEP_COUNTER) {
+            val currentSensorSteps = event.values[0].toInt()
+            Log.d("StepCounterService", "Sensor steps reading: $currentSensorSteps")
+            scope.launch {
+                processSensorSteps(currentSensorSteps)
+            }
+        } else if (event.sensor.type == Sensor.TYPE_ACCELEROMETER) {
+            val x = event.values[0]
+            val y = event.values[1]
+            val z = event.values[2]
+            val magnitude = kotlin.math.sqrt(x*x + y*y + z*z)
 
-        scope.launch {
-            processSensorSteps(currentSensorSteps)
+            // Dynamic peak detection with time lockout to filter hand shakes
+            if (magnitude > STEP_THRESHOLD && (event.timestamp - lastStepTimeNs) > STEP_DELAY_NS) {
+                lastStepTimeNs = event.timestamp
+                Log.d("StepCounterService", "Movement step detected! Magnitude: $magnitude")
+                scope.launch {
+                    addDirectSteps(1)
+                }
+            }
+            magnitudePrevious = magnitude
         }
     }
 
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
+
+    private suspend fun addDirectSteps(count: Int) {
+        val calendar = Calendar.getInstance()
+        val todayYear = calendar.get(Calendar.YEAR)
+        val todayDay = calendar.get(Calendar.DAY_OF_YEAR)
+
+        // Get all step records
+        val allRecords = database.stepDao().getAllStepRecords().firstOrNull() ?: emptyList()
+        val todayRecord = allRecords.find { record ->
+            val recCal = Calendar.getInstance().apply { timeInMillis = record.dateTimeMillis }
+            recCal.get(Calendar.YEAR) == todayYear && recCal.get(Calendar.DAY_OF_YEAR) == todayDay
+        }
+
+        if (todayRecord != null) {
+            val updatedRecord = todayRecord.copy(
+                steps = todayRecord.steps + count,
+                dateTimeMillis = System.currentTimeMillis()
+            )
+            database.stepDao().insertStepRecord(updatedRecord)
+        } else {
+            val newRecord = StepCountRecord(
+                steps = count,
+                dateTimeMillis = System.currentTimeMillis()
+            )
+            database.stepDao().insertStepRecord(newRecord)
+        }
+        updateNotificationWithCurrentSteps()
+    }
 
     private suspend fun processSensorSteps(currentSensorSteps: Int) {
         val sharedPrefs = getSharedPreferences("step_tracker_prefs", Context.MODE_PRIVATE)
@@ -88,37 +142,9 @@ class StepCounterService : Service(), SensorEventListener {
 
         val diff = currentSensorSteps - lastSensorSteps
         if (diff > 0) {
-            // Update today's steps in the database
-            val calendar = Calendar.getInstance()
-            val todayYear = calendar.get(Calendar.YEAR)
-            val todayDay = calendar.get(Calendar.DAY_OF_YEAR)
-
-            // Get all step records
-            val allRecords = database.stepDao().getAllStepRecords().firstOrNull() ?: emptyList()
-            val todayRecord = allRecords.find { record ->
-                val recCal = Calendar.getInstance().apply { timeInMillis = record.dateTimeMillis }
-                recCal.get(Calendar.YEAR) == todayYear && recCal.get(Calendar.DAY_OF_YEAR) == todayDay
-            }
-
-            if (todayRecord != null) {
-                val updatedRecord = todayRecord.copy(
-                    steps = todayRecord.steps + diff,
-                    dateTimeMillis = System.currentTimeMillis()
-                )
-                database.stepDao().insertStepRecord(updatedRecord)
-                Log.d("StepCounterService", "Updated today's record: added $diff steps, new total: ${updatedRecord.steps}")
-            } else {
-                val newRecord = StepCountRecord(
-                    steps = diff,
-                    dateTimeMillis = System.currentTimeMillis()
-                )
-                database.stepDao().insertStepRecord(newRecord)
-                Log.d("StepCounterService", "Created today's record: added $diff steps")
-            }
-
+            addDirectSteps(diff)
             // Save new sensor reading to prefs
             sharedPrefs.edit().putInt("last_sensor_steps", currentSensorSteps).apply()
-            updateNotificationWithCurrentSteps()
         }
     }
 
