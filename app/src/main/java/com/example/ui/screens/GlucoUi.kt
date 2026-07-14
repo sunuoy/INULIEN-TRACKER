@@ -8447,7 +8447,7 @@ fun AnimatedLowInsulinGraphic(modifier: Modifier = Modifier) {
 
     androidx.compose.foundation.Canvas(
         modifier = modifier
-            .size(42.dp)
+            .size(46.dp)
             .graphicsLayer {
                 this.translationY = translationY
             }
@@ -8460,8 +8460,8 @@ fun AnimatedLowInsulinGraphic(modifier: Modifier = Modifier) {
             radius = width / 2f
         )
         
-        val cartridgeWidth = 12.3.dp.toPx()
-        val cartridgeHeight = 28.5.dp.toPx()
+        val cartridgeWidth = 13.5.dp.toPx()
+        val cartridgeHeight = 31.3.dp.toPx()
         val left = (width - cartridgeWidth) / 2f
         val top = (height - cartridgeHeight) / 2f
         
@@ -8469,30 +8469,30 @@ fun AnimatedLowInsulinGraphic(modifier: Modifier = Modifier) {
             color = Color.White.copy(alpha = 0.7f),
             topLeft = androidx.compose.ui.geometry.Offset(left, top),
             size = androidx.compose.ui.geometry.Size(cartridgeWidth, cartridgeHeight),
-            cornerRadius = androidx.compose.ui.geometry.CornerRadius(3.dp.toPx(), 3.dp.toPx()),
-            style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.5.dp.toPx())
+            cornerRadius = androidx.compose.ui.geometry.CornerRadius(3.3.dp.toPx(), 3.3.dp.toPx()),
+            style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.65.dp.toPx())
         )
         
         val pistonY = top + cartridgeHeight * 0.75f
         drawLine(
             color = Color.Gray,
-            start = androidx.compose.ui.geometry.Offset(left + 2.dp.toPx(), pistonY),
-            end = androidx.compose.ui.geometry.Offset(left + cartridgeWidth - 2.dp.toPx(), pistonY),
-            strokeWidth = 2.dp.toPx()
+            start = androidx.compose.ui.geometry.Offset(left + 2.2.dp.toPx(), pistonY),
+            end = androidx.compose.ui.geometry.Offset(left + cartridgeWidth - 2.2.dp.toPx(), pistonY),
+            strokeWidth = 2.2.dp.toPx()
         )
         
-        val liquidHeight = top + cartridgeHeight - pistonY - 2.dp.toPx()
+        val liquidHeight = top + cartridgeHeight - pistonY - 2.2.dp.toPx()
         if (liquidHeight > 0) {
             drawRoundRect(
                 color = Color.Red.copy(alpha = pulseAlpha),
-                topLeft = androidx.compose.ui.geometry.Offset(left + 2.dp.toPx(), pistonY + 1.dp.toPx()),
-                size = androidx.compose.ui.geometry.Size(cartridgeWidth - 4.dp.toPx(), liquidHeight),
-                cornerRadius = androidx.compose.ui.geometry.CornerRadius(1.dp.toPx(), 1.dp.toPx())
+                topLeft = androidx.compose.ui.geometry.Offset(left + 2.2.dp.toPx(), pistonY + 1.1.dp.toPx()),
+                size = androidx.compose.ui.geometry.Size(cartridgeWidth - 4.4.dp.toPx(), liquidHeight),
+                cornerRadius = androidx.compose.ui.geometry.CornerRadius(1.1.dp.toPx(), 1.1.dp.toPx())
             )
         }
         
-        val tipWidth = 3.4.dp.toPx()
-        val tipHeight = 3.4.dp.toPx()
+        val tipWidth = 3.7.dp.toPx()
+        val tipHeight = 3.7.dp.toPx()
         drawRect(
             color = Color.White.copy(alpha = 0.7f),
             topLeft = androidx.compose.ui.geometry.Offset((width - tipWidth) / 2f, top - tipHeight),
