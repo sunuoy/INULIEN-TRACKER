@@ -4,6 +4,8 @@ import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
+import androidx.compose.animation.core.*
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -7614,6 +7616,53 @@ fun SettingsScreen(
 }
 
 @Composable
+fun rememberRunningAnimation(isEnabled: Boolean): Modifier {
+    if (!isEnabled) return Modifier
+    val infiniteTransition = rememberInfiniteTransition(label = "runningAnim")
+    val translationY by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = -5f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(280, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "translationY"
+    )
+    val rotation by infiniteTransition.animateFloat(
+        initialValue = -10f,
+        targetValue = 10f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(280, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "rotation"
+    )
+    return Modifier.graphicsLayer {
+        this.translationY = translationY
+        this.rotationZ = rotation
+    }
+}
+
+@Composable
+fun rememberBeatingHeartAnimation(isEnabled: Boolean): Modifier {
+    if (!isEnabled) return Modifier
+    val infiniteTransition = rememberInfiniteTransition(label = "heartBeatAnim")
+    val scale by infiniteTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = 1.2f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(450, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "scale"
+    )
+    return Modifier.graphicsLayer {
+        this.scaleX = scale
+        this.scaleY = scale
+    }
+}
+
+@Composable
 fun StepsScreen(
     viewModel: com.example.ui.viewmodel.GlucoViewModel,
     onAddStepClick: () -> Unit,
@@ -7822,7 +7871,7 @@ fun StepsScreen(
                                             imageVector = Icons.Default.DirectionsWalk,
                                             contentDescription = "Walk",
                                             tint = if (progress >= 1f) Color(0xFF4CAF50) else MaterialTheme.colorScheme.primary,
-                                            modifier = Modifier.size(24.dp)
+                                            modifier = Modifier.size(24.dp).then(rememberRunningAnimation(isEnabled = isPermissionGranted))
                                         )
                                         Spacer(modifier = Modifier.height(2.dp))
                                         Text(
@@ -8105,7 +8154,7 @@ fun StepsScreen(
                                     imageVector = Icons.Default.DirectionsRun,
                                     contentDescription = null,
                                     tint = secondaryColor,
-                                    modifier = Modifier.size(18.dp)
+                                    modifier = Modifier.size(18.dp).then(rememberRunningAnimation(isEnabled = isPermissionGranted))
                                 )
                             }
                             Spacer(modifier = Modifier.height(4.dp))
@@ -8177,7 +8226,7 @@ fun StepsScreen(
                                     imageVector = Icons.Default.Favorite,
                                     contentDescription = null,
                                     tint = tertiaryColor,
-                                    modifier = Modifier.size(18.dp)
+                                    modifier = Modifier.size(18.dp).then(rememberBeatingHeartAnimation(isEnabled = isPermissionGranted))
                                 )
                             }
                             Spacer(modifier = Modifier.height(4.dp))
