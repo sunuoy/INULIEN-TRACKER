@@ -12,6 +12,8 @@ val gitCommits: Int = providers.exec {
     commandLine("git", "rev-list", "--count", "HEAD")
 }.standardOutput.asText.map { it.trim().toIntOrNull() ?: 1 }.getOrElse(1)
 
+val appVersionName = "1.2.${gitCommits - 43}"
+
 android {
   namespace = "com.example"
   compileSdk { version = release(36) { minorApiLevel = 1 } }
@@ -21,7 +23,7 @@ android {
     minSdk = 24
     targetSdk = 36
     versionCode = gitCommits
-    versionName = "1.2.${gitCommits - 43}"
+    versionName = appVersionName
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
@@ -62,6 +64,11 @@ android {
     buildConfig = true
   }
   testOptions { unitTests { isIncludeAndroidResources = true } }
+
+}
+
+base {
+    archivesName.set("INSULIN-TRACKER_$appVersionName")
 }
 
 // Configure the Secrets Gradle Plugin to use .env and .env.example files
@@ -127,3 +134,5 @@ dependencies {
   "ksp"(libs.androidx.room.compiler)
   "ksp"(libs.moshi.kotlin.codegen)
 }
+
+
