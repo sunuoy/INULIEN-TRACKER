@@ -2851,9 +2851,9 @@ fun HomeScreen(
                                         }
                                         drawPath(
                                             path = path,
-                                            color = Color(0xFFEF5350).copy(alpha = 0.08f),
+                                            color = Color(0xFFEF5350).copy(alpha = 0.5f),
                                             style = androidx.compose.ui.graphics.drawscope.Stroke(
-                                                width = 2.dp.toPx(),
+                                                width = 2.5f.dp.toPx(),
                                                 cap = androidx.compose.ui.graphics.StrokeCap.Round
                                             )
                                         )
@@ -2993,9 +2993,9 @@ fun HomeScreen(
                                         }
                                         drawPath(
                                             path = path,
-                                            color = Color(0xFF2196F3).copy(alpha = 0.08f),
+                                            color = Color(0xFF2196F3).copy(alpha = 0.5f),
                                             style = androidx.compose.ui.graphics.drawscope.Stroke(
-                                                width = 2.dp.toPx(),
+                                                width = 2.5f.dp.toPx(),
                                                 cap = androidx.compose.ui.graphics.StrokeCap.Round
                                             )
                                         )
