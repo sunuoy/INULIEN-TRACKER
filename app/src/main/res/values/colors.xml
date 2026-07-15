@@ -12,9 +12,9 @@
     <!-- ============================================================ -->
     <!--   1. OCEAN DEPTH  |  Dark · Finance · Analytics · Dashboard  -->
     <!-- ============================================================ -->
-    <color name="ocean_depth_background">#0B132B</color>
-    <color name="ocean_depth_surface">#1C2541</color>
-    <color name="ocean_depth_card">#2A3454</color>
+    <color name="ocean_depth_background">#111E2E</color>
+    <color name="ocean_depth_surface">#1B2A3D</color>
+    <color name="ocean_depth_card">#263952</color>
     <color name="ocean_depth_primary">#3B9EFF</color>
     <color name="ocean_depth_accent">#00D4AA</color>
     <color name="ocean_depth_text">#E8F4FD</color>
@@ -23,9 +23,9 @@
     <!-- ============================================================ -->
     <!--   2. AURORA  |  Dark · Music · Creative · Gaming             -->
     <!-- ============================================================ -->
-    <color name="aurora_background">#0B0914</color>
-    <color name="aurora_surface">#171226</color>
-    <color name="aurora_card">#251E3B</color>
+    <color name="aurora_background">#140F24</color>
+    <color name="aurora_surface">#201836</color>
+    <color name="aurora_card">#2D234C</color>
     <color name="aurora_primary">#A78BFA</color>
     <color name="aurora_accent">#34D399</color>
     <color name="aurora_text">#F0EEFF</color>
@@ -34,9 +34,9 @@
     <!-- ============================================================ -->
     <!--   3. MIDNIGHT CARBON  |  Dark · Developer · IDE              -->
     <!-- ============================================================ -->
-    <color name="midnight_carbon_background">#0D0D0D</color>
-    <color name="midnight_carbon_surface">#171717</color>
-    <color name="midnight_carbon_card">#242424</color>
+    <color name="midnight_carbon_background">#12131C</color>
+    <color name="midnight_carbon_surface">#1E202F</color>
+    <color name="midnight_carbon_card">#2B2E42</color>
     <color name="midnight_carbon_primary">#E8E8E8</color>
     <color name="midnight_carbon_accent">#F97316</color>
     <color name="midnight_carbon_text">#F5F5F5</color>
@@ -45,9 +45,9 @@
     <!-- ============================================================ -->
     <!--   4. SAKURA  |  Light · Health · Wellness · Beauty           -->
     <!-- ============================================================ -->
-    <color name="sakura_background">#FFF0F2</color>
-    <color name="sakura_surface">#FFFFFF</color>
-    <color name="sakura_card">#FFF8FA</color>
+    <color name="sakura_background">#FFE3E8</color>
+    <color name="sakura_surface">#FFF0F3</color>
+    <color name="sakura_card">#FFFFFF</color>
     <color name="sakura_primary">#E91E8C</color>
     <color name="sakura_accent">#FF6B9D</color>
     <color name="sakura_text">#2D1B26</color>
@@ -56,9 +56,9 @@
     <!-- ============================================================ -->
     <!--   5. ARCTIC  |  Light · Medical · SaaS · Corporate           -->
     <!-- ============================================================ -->
-    <color name="arctic_background">#F0F4F8</color>
-    <color name="arctic_surface">#FFFFFF</color>
-    <color name="arctic_card">#EEF4FB</color>
+    <color name="arctic_background">#E2EAFC</color>
+    <color name="arctic_surface">#EDF2FB</color>
+    <color name="arctic_card">#FFFFFF</color>
     <color name="arctic_primary">#0066CC</color>
     <color name="arctic_accent">#00A878</color>
     <color name="arctic_text">#0D1F33</color>
@@ -67,9 +67,9 @@
     <!-- ============================================================ -->
     <!--   6. LEMON ZEST  |  Light · Kids · Food · Retail             -->
     <!-- ============================================================ -->
-    <color name="lemon_zest_background">#FFFDF0</color>
-    <color name="lemon_zest_surface">#FFFFFF</color>
-    <color name="lemon_zest_card">#FFFDE8</color>
+    <color name="lemon_zest_background">#FFFCE5</color>
+    <color name="lemon_zest_surface">#FFFDF0</color>
+    <color name="lemon_zest_card">#FFFFFF</color>
     <color name="lemon_zest_primary">#D4A017</color>
     <color name="lemon_zest_accent">#E85D04</color>
     <color name="lemon_zest_text">#1A1400</color>
@@ -78,9 +78,9 @@
     <!-- ============================================================ -->
     <!--   7. FOREST CALM  |  Nature · Dark · Outdoor · Eco           -->
     <!-- ============================================================ -->
-    <color name="forest_calm_background">#081007</color>
-    <color name="forest_calm_surface">#11200E</color>
-    <color name="forest_calm_card">#1B3019</color>
+    <color name="forest_calm_background">#0F2210</color>
+    <color name="forest_calm_surface">#18331A</color>
+    <color name="forest_calm_card">#234927</color>
     <color name="forest_calm_primary">#5CB85C</color>
     <color name="forest_calm_accent">#A3D977</color>
     <color name="forest_calm_text">#E8F5E9</color>
@@ -89,9 +89,9 @@
     <!-- ============================================================ -->
     <!--   8. DESERT SAND  |  Nature · Light · Travel · Lifestyle     -->
     <!-- ============================================================ -->
-    <color name="desert_sand_background">#FAF4EA</color>
-    <color name="desert_sand_surface">#FFFFFF</color>
-    <color name="desert_sand_card">#F5EDE0</color>
+    <color name="desert_sand_background">#F7EBE1</color>
+    <color name="desert_sand_surface">#FFFDFB</color>
+    <color name="desert_sand_card">#FFFFFF</color>
     <color name="desert_sand_primary">#C2853A</color>
     <color name="desert_sand_accent">#D95E2B</color>
     <color name="desert_sand_text">#2C1A0A</color>
@@ -100,9 +100,9 @@
     <!-- ============================================================ -->
     <!--   9. NEON NOIR  |  Dark · Gaming · Crypto · Night            -->
     <!-- ============================================================ -->
-    <color name="neon_noir_background">#05050D</color>
-    <color name="neon_noir_surface">#0C0C1A</color>
-    <color name="neon_noir_card">#161630</color>
+    <color name="neon_noir_background">#0E091B</color>
+    <color name="neon_noir_surface">#191130</color>
+    <color name="neon_noir_card">#251A46</color>
     <color name="neon_noir_primary">#FF2D78</color>
     <color name="neon_noir_accent">#00FFD1</color>
     <color name="neon_noir_text">#FFFFFF</color>
@@ -111,9 +111,9 @@
     <!-- ============================================================ -->
     <!--  10. SLATE PRO  |  Professional · Light · Finance · Legal    -->
     <!-- ============================================================ -->
-    <color name="slate_pro_background">#ECEFF1</color>
-    <color name="slate_pro_surface">#FFFFFF</color>
-    <color name="slate_pro_card">#EAEDF2</color>
+    <color name="slate_pro_background">#E2E7EC</color>
+    <color name="slate_pro_surface">#F0F3F6</color>
+    <color name="slate_pro_card">#FFFFFF</color>
     <color name="slate_pro_primary">#3D5A80</color>
     <color name="slate_pro_accent">#E07A5F</color>
     <color name="slate_pro_text">#1A2332</color>
@@ -122,9 +122,9 @@
     <!-- ============================================================ -->
     <!--  11. ROYAL INK  |  Professional · Dark · Education           -->
     <!-- ============================================================ -->
-    <color name="royal_ink_background">#050714</color>
-    <color name="royal_ink_surface">#0E112A</color>
-    <color name="royal_ink_card">#181C38</color>
+    <color name="royal_ink_background">#0F122B</color>
+    <color name="royal_ink_surface">#1A1E43</color>
+    <color name="royal_ink_card">#272B5C</color>
     <color name="royal_ink_primary">#6C63FF</color>
     <color name="royal_ink_accent">#FFD700</color>
     <color name="royal_ink_text">#F0EFFF</color>
@@ -133,9 +133,9 @@
     <!-- ============================================================ -->
     <!--  12. CORAL BLOOM  |  Vibrant · Light · Social · Fashion      -->
     <!-- ============================================================ -->
-    <color name="coral_bloom_background">#FFF5F2</color>
-    <color name="coral_bloom_surface">#FFFFFF</color>
-    <color name="coral_bloom_card">#FFEEEA</color>
+    <color name="coral_bloom_background">#FFEAE3</color>
+    <color name="coral_bloom_surface">#FFF4F0</color>
+    <color name="coral_bloom_card">#FFFFFF</color>
     <color name="coral_bloom_primary">#FF5733</color>
     <color name="coral_bloom_accent">#FF9F1C</color>
     <color name="coral_bloom_text">#1F0A04</color>
