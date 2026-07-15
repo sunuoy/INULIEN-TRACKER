@@ -24,6 +24,7 @@ import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -1018,13 +1019,23 @@ class GlucoViewModel(application: Application) : AndroidViewModel(application) {
         return connection
     }
 
+    private var downloadJob: kotlinx.coroutines.Job? = null
+
+    fun cancelApkDownload() {
+        downloadJob?.cancel()
+        downloadJob = null
+        _isDownloading.value = false
+        _downloadStatus.value = null
+        _downloadProgress.value = 0f
+    }
+
     fun downloadAndInstallApk(apkUrl: String) {
         if (_isDownloading.value) return
         _isDownloading.value = true
         _downloadProgress.value = 0f
         _downloadStatus.value = "Starting download..."
 
-        viewModelScope.launch(Dispatchers.IO) {
+        downloadJob = viewModelScope.launch(Dispatchers.IO) {
             try {
                 val context = getApplication<Application>()
                 val connection = getRedirectedConnection(apkUrl)
@@ -1035,33 +1046,35 @@ class GlucoViewModel(application: Application) : AndroidViewModel(application) {
                 }
 
                 val fileLength = connection.contentLength
-                val input = connection.inputStream
                 val updateFile = java.io.File(context.cacheDir, "gluco_update.apk")
                 if (updateFile.exists()) {
                     updateFile.delete()
                 }
 
-                val output = java.io.FileOutputStream(updateFile)
-                val buffer = ByteArray(4096)
-                var total: Long = 0
-                var count: Int
-                while (input.read(buffer).also { count = it } != -1) {
-                    total += count
-                    if (fileLength > 0) {
-                        val progress = total.toFloat() / fileLength
-                        withContext(Dispatchers.Main) {
-                            _downloadProgress.value = progress
-                            val mbDown = String.format("%.1f", total / 1_048_576.0)
-                            val mbTotal = String.format("%.1f", fileLength / 1_048_576.0)
-                            _downloadStatus.value = "Downloading... $mbDown / $mbTotal MB"
+                connection.inputStream.use { input ->
+                    java.io.FileOutputStream(updateFile).use { output ->
+                        val buffer = ByteArray(4096)
+                        var total: Long = 0
+                        var count = 0
+                        while (isActive && input.read(buffer).also { count = it } != -1) {
+                            total += count
+                            if (fileLength > 0) {
+                                val progress = total.toFloat() / fileLength
+                                withContext(Dispatchers.Main) {
+                                    _downloadProgress.value = progress
+                                    val mbDown = String.format("%.1f", total / 1_048_576.0)
+                                    val mbTotal = String.format("%.1f", fileLength / 1_048_576.0)
+                                    _downloadStatus.value = "Downloading... $mbDown / $mbTotal MB"
+                                }
+                            }
+                            output.write(buffer, 0, count)
                         }
+                        output.flush()
                     }
-                    output.write(buffer, 0, count)
                 }
 
-                output.flush()
-                output.close()
-                input.close()
+                // If cancelled mid-way, don't proceed to install
+                if (!isActive) return@launch
 
                 withContext(Dispatchers.Main) {
                     _downloadProgress.value = 1f
@@ -1108,8 +1121,11 @@ class GlucoViewModel(application: Application) : AndroidViewModel(application) {
                     }
                 }
             } catch (e: Exception) {
-                withContext(Dispatchers.Main) {
-                    _downloadStatus.value = "Error: ${e.localizedMessage ?: "Unknown error"}"
+                // Only show error if the coroutine wasn't cancelled intentionally
+                if (isActive) {
+                    withContext(Dispatchers.Main) {
+                        _downloadStatus.value = "Error: ${e.localizedMessage ?: "Unknown error"}"
+                    }
                 }
             } finally {
                 withContext(Dispatchers.Main) {

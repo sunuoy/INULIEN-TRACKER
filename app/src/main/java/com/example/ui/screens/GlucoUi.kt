@@ -491,9 +491,10 @@ fun GlucoAppLayout(viewModel: GlucoViewModel) {
 
         AlertDialog(
             onDismissRequest = { 
-                if (!isDownloading) {
-                    viewModel.dismissUpdateDialog() 
+                if (isDownloading) {
+                    viewModel.cancelApkDownload()
                 }
+                viewModel.dismissUpdateDialog() 
             },
             title = {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -593,7 +594,16 @@ fun GlucoAppLayout(viewModel: GlucoViewModel) {
                 }
             },
             dismissButton = {
-                if (!isDownloading) {
+                if (isDownloading) {
+                    TextButton(
+                        onClick = {
+                            viewModel.cancelApkDownload()
+                            viewModel.dismissUpdateDialog()
+                        }
+                    ) {
+                        Text("Cancel")
+                    }
+                } else {
                     TextButton(
                         onClick = { viewModel.dismissUpdateDialog() }
                     ) {
